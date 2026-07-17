@@ -2,22 +2,11 @@
 
 import { useState } from "react";
 import type { RankedSuggestion, SearchResponse } from "@/lib/types";
+import { backorderUrl, buyUrl } from "@/lib/links";
+import { WatchButton } from "./watch-button";
 
 const TLD_CHOICES = [".com", ".io", ".ai", ".co", ".app", ".dev", ".xyz", ".me"];
 const DEFAULT_SELECTED = [".com", ".io", ".ai", ".co", ".app"];
-
-function buyUrl(domain: string) {
-  // Outbound search on a registrar — swap for an affiliate/registrar API link.
-  return `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(
-    domain,
-  )}`;
-}
-
-function backorderUrl(domain: string) {
-  // Domains that are dropping can't be registered directly — they need a
-  // backorder/drop-catch service.
-  return `https://www.dropcatch.com/domain/${encodeURIComponent(domain)}`;
-}
 
 const STATUS_STYLE: Record<
   RankedSuggestion["availability"]["status"],
@@ -94,8 +83,21 @@ function DropNote({ a }: { a: RankedSuggestion["availability"] }) {
 
 const SOURCE_LABEL = { ai: "AI", rule: "combo", hack: "hack" } as const;
 
+/**
+ * Watching only makes sense for a domain whose status can still change in a way
+ * you'd act on. `available` needs no watch (just buy it), and `reserved` will
+ * never become registrable. `unknown` is excluded because we can't observe it —
+ * the API would refuse the watch anyway, so don't offer it.
+ */
+const WATCHABLE: ReadonlySet<RankedSuggestion["availability"]["status"]> = new Set([
+  "active",
+  "parked",
+  "expiring",
+  "deleting",
+]);
+
 function ResultCard({ r }: { r: RankedSuggestion }) {
-  const { bucket } = r.availability;
+  const { bucket, status } = r.availability;
   const registrable = bucket === "registrable";
   const dropping = bucket === "dropping";
 
@@ -126,18 +128,21 @@ function ResultCard({ r }: { r: RankedSuggestion }) {
           {r.scoreReasons.join(" · ")}
         </p>
       </div>
-      <a
-        href={cta.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-          registrable || dropping
-            ? "bg-foreground text-background hover:opacity-90"
-            : "border border-black/15 dark:border-white/15 opacity-70 hover:opacity-100"
-        }`}
-      >
-        {cta.label}
-      </a>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {WATCHABLE.has(status) && <WatchButton domain={r.domain} />}
+        <a
+          href={cta.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            registrable || dropping
+              ? "bg-foreground text-background hover:opacity-90"
+              : "border border-black/15 dark:border-white/15 opacity-70 hover:opacity-100"
+          }`}
+        >
+          {cta.label}
+        </a>
+      </div>
     </li>
   );
 }

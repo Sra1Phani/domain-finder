@@ -1,0 +1,74 @@
+# Watchlist poller.
+#
+# Why not Vercel Cron: on the Hobby plan it fires once per day, which can't
+# deliver the 6h/hourly cadence a pendingDelete domain needs — and pendingDelete
+# is a fixed ~5-day window, so a daily check can burn most of the warning the
+# product exists to give. GitHub Actions runs this hourly for free instead.
+#
+# Caveat worth knowing: GHA scheduled workflows are best-effort. They can lag by
+# minutes (occasionally much longer under load on the hour), and GitHub disables
+# schedules on repos with no activity for 60 days. Both are acceptable here — the
+# deliverable is a ~5-day warning, not a millisecond race, and nothing about
+# winning a drop depends on this being punctual. If that ever stops being true,
+# the fix is Vercel Pro cron, not a tighter schedule here.
+#
+# Setup:
+#   gh secret set POLL_URL     # https://<your-app>/api/cron/poll
+#   gh secret set CRON_SECRET  # must match the deployment's CRON_SECRET
+
+name: poll-watchlist
+
+on:
+  schedule:
+    # Hourly, deliberately off the hour: :17 is less contended than :00, where
+    # everyone's cron piles up and GHA's queue lag is worst.
+    - cron: "17 * * * *"
+  workflow_dispatch: # lets you trigger a poll by hand from the Actions tab
+
+concurrency:
+  # Never let a slow run overlap the next tick. The poller is idempotent, but
+  # overlapping runs would double the RDAP load for no benefit.
+  group: poll-watchlist
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Hit the poll endpoint
+        env:
+          POLL_URL: ${{ secrets.POLL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$POLL_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::POLL_URL and CRON_SECRET repository secrets must be set"
+            exit 1
+          fi
+
+          # --fail-with-body so a non-2xx both prints the reason and fails the step.
+          # --max-time generously above the route's own budget.
+          http_code=$(curl --silent --show-error --fail-with-body \
+            --max-time 300 \
+            --write-out "%{http_code}" \
+            --output response.json \
+            --header "authorization: Bearer $CRON_SECRET" \
+            "$POLL_URL") || {
+              echo "::error::poll request failed"
+              cat response.json 2>/dev/null
+              exit 1
+            }
+
+          echo "HTTP $http_code"
+          cat response.json
+          echo ""
+
+          # Surface the run in the job summary so the Actions tab is a usable log
+          # of what the poller has been doing.
+          {
+            echo "### Poll result"
+            echo ""
+            echo '```json'
+            cat response.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

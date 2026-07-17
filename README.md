@@ -49,6 +49,85 @@ query ─▶ generate ─▶ check availability ─▶ rank ─▶ results
 Swapping RDAP for a paid registrar API later (pricing + real buy flow) only
 touches `lib/availability.ts` — nothing else in the pipeline knows the source.
 
+## Watchlist
+
+Track a domain, get emailed when it enters the drop path, hand off to a
+backorder service. **This is a scheduler around `availabilityProvider.check()`,
+not new availability logic.**
+
+```
+cron ─▶ due-queue ─▶ check ─▶ transition? ─▶ alert (deleting | available)
+        (next_check_at)       (watch_events)   deduped via `alerts`
+```
+
+- **Adaptive due-queue** (`lib/cadence.ts`) — every domain carries a
+  `next_check_at`; the poller only touches what's due. Cadence follows status:
+  far-off `active` weekly → expiry <30d or redemption daily → `pendingDelete`
+  every 6h → hourly inside 24h of the estimated drop. RDAP load stays
+  proportional to how *interesting* a domain is, not how many watches exist.
+- **State is keyed by domain, not by watch** (`lib/db/schema.ts`). A hundred
+  people watching the same short `.com` is one row, one RDAP call, one
+  transition, fanned out to a hundred inboxes. Load scales with *unique domains
+  observed*, not users × domains — which matters because registries don't sell
+  capacity.
+- **Transition log** (`watch_events`) is the source of truth. Alerts fire only
+  on a change, and `alerts` has `unique(watch_id, event_id)` so a cron retry
+  can't double-send.
+- **Only two statuses alert**: `deleting` (pendingDelete — the fixed ~5-day
+  window, i.e. the last moment a backorder can be placed) and `available`.
+  Everything else is logged and shown in the UI but stays silent.
+- **An `unknown` is not a transition.** A 429 or timeout means "we couldn't
+  tell", not "the domain changed" — the last known status stands, and the check
+  backs off exponentially (1h, 2h, 4h … capped at a day).
+- **TLDs we can't observe are refused at watch time.** `.co`/`.es`/`.at`/`.gg`
+  have no public RDAP server, so a watch on them could never fire. Better to say
+  so than to accept it and silently never alert.
+- Free watches are capped at 3 per email (`FREE_WATCH_LIMIT` in `lib/watch.ts`).
+
+Identity is an email plus an unguessable manage token — no accounts, no
+sessions, no users table. The token rides in alert links and authenticates
+`/watch/<token>`.
+
+### Running the watchlist locally
+
+```bash
+# any Postgres will do
+docker run -d --name df-pg -e POSTGRES_PASSWORD=domainfinder \
+  -e POSTGRES_USER=domainfinder -e POSTGRES_DB=domainfinder \
+  -p 5433:5432 postgres:16-alpine
+
+cp .env.example .env.local   # set DATABASE_URL + CRON_SECRET
+npm run db:push              # create the tables
+npm run dev
+```
+
+Without `RESEND_API_KEY` alerts are **printed to the console** rather than sent,
+so the whole flow is drivable with no third-party signup. Trigger a poll by hand:
+
+```bash
+curl -H "authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/poll
+```
+
+### Scheduling in production
+
+`.github/workflows/poll.yml` hits `/api/cron/poll` hourly. Vercel's Hobby cron
+only fires **once per day**, which can burn most of a ~5-day pendingDelete
+warning, so the schedule lives in GitHub Actions instead. Set the `POLL_URL` and
+`CRON_SECRET` repository secrets. GHA cron is best-effort and can lag a few
+minutes — fine for a multi-day warning, and nothing here depends on being
+punctual.
+
+## Tests
+
+```bash
+npm test
+```
+
+`lib/rdap-status.test.ts` and `lib/cadence.test.ts` are pure. `lib/poll.test.ts`
+drives the real database with a **fake availability provider** — `pendingDelete`
+and `redemptionPeriod` are too rare in the wild to find on demand, and they're
+exactly what this feature exists to catch. It skips when `DATABASE_URL` is unset.
+
 ## Getting started
 
 ```bash
@@ -56,7 +135,7 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-The app works with **no configuration** — availability (RDAP) and rule-based
+**Search** works with **no configuration** — availability (RDAP) and rule-based
 generation need no keys. To enable AI brainstorming, copy `.env.example` to
 `.env.local` and set an AI Gateway key:
 
@@ -64,6 +143,10 @@ generation need no keys. To enable AI brainstorming, copy `.env.example` to
 cp .env.example .env.local
 # then set AI_GATEWAY_API_KEY=...
 ```
+
+The **watchlist** is the only part that needs a database; search keeps working
+without one (`getDb()` is lazy and only throws when a watch route calls it).
+See [Watchlist](#watchlist) above.
 
 ## API
 
