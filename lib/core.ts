@@ -17,19 +17,28 @@ const generateObject: GenerateObjectFn = (args) =>
     prompt: args.prompt,
   });
 
-const core = createCore({
-  fetch: (url, init) => fetch(url, init),
-  now: () => new Date(),
-  config: {
-    aiModel: process.env.DOMAIN_AI_MODEL,
-    // Presence gates the AI path — mirrors the old hasAiCredentials() check.
-    aiApiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
-  },
-  generateObject,
-  // GitHub namespace checks: the token is read HERE (surface), injected into
-  // core. Without it, GitHub is limited to 60 req/hr per IP; with it, 5000/hr.
-  githubToken: process.env.GITHUB_TOKEN,
-});
+/**
+ * Construct a core from environment-injected deps. This is the ONE place env is
+ * read; the core stays env-free. Used both for the module singleton below and,
+ * per request, by the MCP surface (app/api/[transport]/route.ts).
+ */
+export function makeCore() {
+  return createCore({
+    fetch: (url, init) => fetch(url, init),
+    now: () => new Date(),
+    config: {
+      aiModel: process.env.DOMAIN_AI_MODEL,
+      // Presence gates the AI path — mirrors the old hasAiCredentials() check.
+      aiApiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
+    },
+    generateObject,
+    // GitHub namespace checks: the token is read HERE (surface), injected into
+    // core. Without it, GitHub is limited to 60 req/hr per IP; with it, 5000/hr.
+    githubToken: process.env.GITHUB_TOKEN,
+  });
+}
+
+const core = makeCore();
 
 // Search benefits from the per-domain availability cache (core.provider).
 export const search = core.search;
