@@ -14,6 +14,7 @@ export * from "./rank";
 export * from "./cadence";
 export * from "./cache";
 export * from "./availability";
+export * from "./namespace";
 export * from "./hacks";
 export * from "./generate";
 export * from "./search";

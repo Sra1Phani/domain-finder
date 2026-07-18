@@ -95,3 +95,34 @@ export type SearchResponse = {
     tookMs: number;
   };
 };
+
+// --- Cross-namespace availability (github / npm / pypi) ----------------------
+// A sibling capability to domain availability: is this label free as a handle
+// on the surfaces a founder also cares about? Deliberately its own type family,
+// not the domain AvailabilityResult — the failure modes and normalization rules
+// differ per surface.
+
+/** Namespaces we can check. Extensible; first cut is these three. */
+export type Surface = "github" | "npm" | "pypi";
+
+export type NamespaceStatus =
+  | "available"
+  /** already registered on the surface */
+  | "taken"
+  /** the name can't exist on this surface at all (fails its naming rules) */
+  | "invalid"
+  /** we genuinely couldn't tell — NEVER conflated with "available" */
+  | "unknown";
+
+export type NamespaceResult = {
+  surface: Surface;
+  /** the input label as given */
+  name: string;
+  /** the surface-normalized form actually checked */
+  normalized: string;
+  status: NamespaceStatus;
+  /** canonical location (where a taken name lives, or where a free one would) */
+  url?: string;
+  /** ISO timestamp */
+  checkedAt: string;
+};
