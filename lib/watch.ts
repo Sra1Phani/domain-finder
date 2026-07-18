@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb, type Db } from "./db";
 import { domains, watchEvents, watches } from "./db/schema";
-import { availabilityProvider } from "./availability";
+import { availabilityProvider } from "./core";
 import { nextCheckAt, type AvailabilityResult } from "@domain-finder/core";
 
 /** Free tier. One domain is a demo; three is a habit. */

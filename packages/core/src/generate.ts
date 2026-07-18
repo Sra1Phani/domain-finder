@@ -3,15 +3,42 @@
 // Both paths produce *labels* (second-level names, no TLD). They're merged,
 // normalised, deduped, then expanded across the requested TLDs into concrete
 // domain candidates for availability checking.
+//
+// The AI call is INJECTED, and its availability is gated by injected config
+// rather than a process.env read — so the exact "degrade to rule-based when no
+// credentials" behavior is preserved, but the core never reads the environment
+// and never hardcodes the AI client. The zod schema and prompt (the generation
+// logic) stay here in the core; only the transport (generateObject) is injected.
 
-import { generateObject } from "ai";
 import { z } from "zod";
-import {
-  DEFAULT_TLDS,
-  type Suggestion,
-  type SuggestionSource,
-} from "@domain-finder/core";
+import { DEFAULT_TLDS } from "./tlds";
+import type { Suggestion, SuggestionSource } from "./types";
+import type { FetchLike } from "./availability";
+import type { CacheStore } from "./cache";
 import { domainHacks } from "./hacks";
+
+const DEFAULT_AI_MODEL = "anthropic/claude-haiku-4-5";
+
+/** Injected AI transport, shaped after the AI SDK's generateObject. */
+export type GenerateObjectFn = <T>(args: {
+  model: string;
+  schema: z.ZodType<T>;
+  prompt: string;
+}) => Promise<{ object: T }>;
+
+/** Replaces generate.ts's old process.env reads. Presence of aiApiKey gates AI. */
+export type GenerateConfig = {
+  aiModel?: string;
+  /** When absent, generation degrades to rule-based (exactly as before). */
+  aiApiKey?: string;
+};
+
+export type GenerateDeps = {
+  config: GenerateConfig;
+  generateObject?: GenerateObjectFn;
+  fetch: FetchLike;
+  cache: CacheStore;
+};
 
 // --- label hygiene -----------------------------------------------------------
 
@@ -82,22 +109,20 @@ export function ruleBasedLabels(query: string): string[] {
 
 // --- AI path -----------------------------------------------------------------
 
-function hasAiCredentials(): boolean {
-  // Locally an AI Gateway key is required; on Vercel an OIDC token is injected.
-  return Boolean(
-    process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
-  );
-}
-
-const AI_MODEL = process.env.DOMAIN_AI_MODEL ?? "anthropic/claude-haiku-4-5";
-
 type AiLabel = { label: string; rationale: string };
 
-export async function aiLabels(query: string, count = 12): Promise<AiLabel[]> {
-  if (!hasAiCredentials()) return [];
+async function aiLabels(
+  query: string,
+  count: number,
+  deps: Pick<GenerateDeps, "config" | "generateObject">,
+): Promise<AiLabel[]> {
+  const { config, generateObject } = deps;
+  // Exact degrade-to-rule-based behavior: no credentials (or no injected
+  // transport) => no AI, empty result, caller falls back to rule-based.
+  if (!config.aiApiKey || !generateObject) return [];
   try {
     const { object } = await generateObject({
-      model: AI_MODEL,
+      model: config.aiModel ?? DEFAULT_AI_MODEL,
       schema: z.object({
         names: z
           .array(
@@ -153,13 +178,15 @@ const MAX_HACKS = 8;
 
 export async function generateSuggestions(
   query: string,
-  opts: GenerateOptions = {},
+  opts: GenerateOptions,
+  deps: GenerateDeps,
 ): Promise<GenerateResult> {
   const tlds = opts.tlds?.length ? opts.tlds : DEFAULT_TLDS;
   const maxCandidates = opts.maxCandidates ?? 45;
   const maxLabels = opts.maxLabels ?? 24;
 
-  const aiResults = opts.useAi === false ? [] : await aiLabels(query);
+  const aiResults =
+    opts.useAi === false ? [] : await aiLabels(query, 12, deps);
   const aiUsed = aiResults.length > 0;
 
   // AI labels lead (they carry rationale and are usually more brandable),
@@ -190,7 +217,7 @@ export async function generateSuggestions(
       ...keywords(query),
       ...ordered.filter(([, m]) => m.source === "ai").map(([sld]) => sld),
     ];
-    const hacks = await domainHacks(hackWords);
+    const hacks = await domainHacks(hackWords, { fetch: deps.fetch, cache: deps.cache });
     suggestions.push(...hacks.slice(0, MAX_HACKS));
   }
 

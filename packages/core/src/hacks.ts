@@ -3,10 +3,16 @@
 //
 // This needs no API — just IANA's list of every delegated TLD. For each
 // candidate word we look for a zone that matches its tail and split there.
+// fetch and the cache are injected; the zone list is static, so it's cached
+// with a long TTL rather than a module-global promise.
 
-import type { Suggestion } from "@domain-finder/core";
+import type { Suggestion } from "./types";
+import type { CacheStore } from "./cache";
+import type { FetchLike } from "./availability";
 
 const IANA_TLDS = "https://data.iana.org/TLD/tlds-alpha-by-domain.txt";
+const ZONES_KEY = "iana:zones";
+const ZONES_TTL_SECONDS = 86_400;
 
 // A hack only reads well if the remaining stem is a real chunk of word. One or
 // two letters ("g.le") is cute but rarely brandable; we require a bit more.
@@ -17,11 +23,14 @@ const MAX_STEM = 10;
 // Long zones ("photography") make the split pointless — the hack should be short.
 const MAX_ZONE = 4;
 
-let zonesPromise: Promise<string[]> | null = null;
+export type HackDeps = {
+  fetch: FetchLike;
+  cache: CacheStore;
+};
 
-async function loadZones(): Promise<string[]> {
+async function loadZones(fetchFn: FetchLike): Promise<string[]> {
   try {
-    const res = await fetch(IANA_TLDS, { signal: AbortSignal.timeout(6000) });
+    const res = await fetchFn(IANA_TLDS, { signal: AbortSignal.timeout(6000) });
     if (!res.ok) return [];
     const text = await res.text();
     return text
@@ -33,8 +42,12 @@ async function loadZones(): Promise<string[]> {
   }
 }
 
-function getZones(): Promise<string[]> {
-  return (zonesPromise ??= loadZones());
+async function getZones(deps: HackDeps): Promise<string[]> {
+  const cached = (await deps.cache.get(ZONES_KEY)) as string[] | undefined;
+  if (cached) return cached;
+  const zones = await loadZones(deps.fetch);
+  await deps.cache.set(ZONES_KEY, zones, ZONES_TTL_SECONDS);
+  return zones;
 }
 
 /**
@@ -45,8 +58,11 @@ function getZones(): Promise<string[]> {
  *   "faceboo"  -> (nothing)
  *   "startup"  -> star.tup? no — "tup" isn't a zone
  */
-export async function domainHacks(words: string[]): Promise<Suggestion[]> {
-  const zones = await getZones();
+export async function domainHacks(
+  words: string[],
+  deps: HackDeps,
+): Promise<Suggestion[]> {
+  const zones = await getZones(deps);
   if (zones.length === 0) return [];
 
   const byLength = zones.filter((z) => z.length <= MAX_ZONE);

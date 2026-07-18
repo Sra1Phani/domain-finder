@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { search } from "@/lib/search";
+import { search } from "@/lib/core";
 import type { SearchRequest } from "@domain-finder/core";
 import { RateLimiter, clientKey } from "@/lib/rate-limit";
 

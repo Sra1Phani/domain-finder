@@ -9,6 +9,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
   "scripts": {
     "test": "node --import tsx --test --test-force-exit src/*.test.ts"
   }

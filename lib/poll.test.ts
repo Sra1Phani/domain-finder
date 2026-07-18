@@ -21,7 +21,7 @@ import {
   type AvailabilityResult,
   type AvailabilityStatus,
 } from "@domain-finder/core";
-import type { AvailabilityProvider } from "./availability";
+import type { AvailabilityProvider } from "@domain-finder/core";
 
 const PREFIX = "polltest-";
 const DOMAIN = `${PREFIX}drop.com`;

@@ -19,15 +19,13 @@
 import { and, asc, eq, exists, lte, sql } from "drizzle-orm";
 import { getDb, type Db } from "./db";
 import { alerts, domains, watchEvents, watches } from "./db/schema";
+import { availabilityProvider } from "./core";
 import {
-  availabilityProvider,
   checkMany,
-  type AvailabilityProvider,
-} from "./availability";
-import {
   isAlertable,
   isTerminal,
   nextCheckAt,
+  type AvailabilityProvider,
   type AvailabilityResult,
 } from "@domain-finder/core";
 import { buildAlert } from "./alert-copy";
