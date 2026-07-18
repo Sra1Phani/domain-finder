@@ -4,7 +4,7 @@
 // This needs no API — just IANA's list of every delegated TLD. For each
 // candidate word we look for a zone that matches its tail and split there.
 
-import type { Suggestion } from "./types";
+import type { Suggestion } from "@domain-finder/core";
 
 const IANA_TLDS = "https://data.iana.org/TLD/tlds-alpha-by-domain.txt";
 

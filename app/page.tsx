@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { RankedSuggestion, SearchResponse } from "@/lib/types";
+import type { RankedSuggestion, SearchResponse } from "@domain-finder/core";
 import { backorderUrl, buyUrl } from "@/lib/links";
 import { WatchButton } from "./watch-button";
 

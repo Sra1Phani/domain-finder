@@ -10,7 +10,7 @@
 // says "it dropped, and it was probably caught — here's how to check". Promising
 // the catch would be the easy copy and a lie.
 
-import type { AvailabilityStatus } from "./types";
+import type { AvailabilityStatus } from "@domain-finder/core";
 import { backorderUrl, buyUrl } from "./links";
 
 export type AlertInput = {

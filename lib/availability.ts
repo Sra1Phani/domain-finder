@@ -10,8 +10,13 @@
 // The provider interface exists so a paid registrar provider (pricing + buy
 // links) can be dropped in later without touching generation/ranking/routing.
 
-import type { AvailabilityResult, AvailabilityStatus } from "./types";
-import { bucketFor, interpretRegistered, type RdapDomain } from "./rdap-status";
+import {
+  bucketFor,
+  interpretRegistered,
+  type AvailabilityResult,
+  type AvailabilityStatus,
+  type RdapDomain,
+} from "@domain-finder/core";
 
 export interface AvailabilityProvider {
   readonly name: string;

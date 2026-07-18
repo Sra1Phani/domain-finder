@@ -2,8 +2,11 @@
 
 import { availabilityProvider, checkMany } from "./availability";
 import { generateSuggestions } from "./generate";
-import { rankSuggestions } from "./rank";
-import type { SearchRequest, SearchResponse } from "./types";
+import {
+  rankSuggestions,
+  type SearchRequest,
+  type SearchResponse,
+} from "@domain-finder/core";
 
 export async function search(req: SearchRequest): Promise<SearchResponse> {
   const started = Date.now();

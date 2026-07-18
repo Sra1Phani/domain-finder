@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // @domain-finder/core ships untranspiled TypeScript source (its package
+  // "exports" point at src/index.ts), so Next must transpile it like app code.
+  transpilePackages: ["@domain-finder/core"],
 };
 
 export default nextConfig;

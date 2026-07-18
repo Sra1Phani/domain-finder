@@ -16,9 +16,12 @@ import { and, eq, like } from "drizzle-orm";
 import { getDb, hasDatabase } from "./db";
 import { alerts, domains, watchEvents, watches } from "./db/schema";
 import { pollDue } from "./poll";
-import { HOUR } from "./cadence";
+import {
+  HOUR,
+  type AvailabilityResult,
+  type AvailabilityStatus,
+} from "@domain-finder/core";
 import type { AvailabilityProvider } from "./availability";
-import type { AvailabilityResult, AvailabilityStatus } from "./types";
 
 const PREFIX = "polltest-";
 const DOMAIN = `${PREFIX}drop.com`;

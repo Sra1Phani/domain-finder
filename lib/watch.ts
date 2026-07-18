@@ -9,8 +9,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb, type Db } from "./db";
 import { domains, watchEvents, watches } from "./db/schema";
 import { availabilityProvider } from "./availability";
-import { nextCheckAt } from "./cadence";
-import type { AvailabilityResult } from "./types";
+import { nextCheckAt, type AvailabilityResult } from "@domain-finder/core";
 
 /** Free tier. One domain is a demo; three is a habit. */
 export const FREE_WATCH_LIMIT = 3;

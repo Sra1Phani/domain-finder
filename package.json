@@ -2,16 +2,20 @@
   "name": "domain-finder",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --env-file-if-exists=.env.local --test --test-force-exit lib/*.test.ts",
+    "test": "node --import tsx --env-file-if-exists=.env.local --test --test-force-exit lib/*.test.ts packages/core/src/*.test.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@domain-finder/core": "*",
     "ai": "^7.0.30",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.10",

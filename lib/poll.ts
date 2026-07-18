@@ -24,10 +24,14 @@ import {
   checkMany,
   type AvailabilityProvider,
 } from "./availability";
-import { isAlertable, isTerminal, nextCheckAt } from "./cadence";
+import {
+  isAlertable,
+  isTerminal,
+  nextCheckAt,
+  type AvailabilityResult,
+} from "@domain-finder/core";
 import { buildAlert } from "./alert-copy";
 import { getMailer } from "./mailer";
-import type { AvailabilityResult } from "./types";
 
 /**
  * Per-run volume cap. RDAP is other people's infrastructure and registries don't

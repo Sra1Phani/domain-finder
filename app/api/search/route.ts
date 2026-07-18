@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { search } from "@/lib/search";
-import type { SearchRequest } from "@/lib/types";
+import type { SearchRequest } from "@domain-finder/core";
 import { RateLimiter, clientKey } from "@/lib/rate-limit";
 
 // RDAP calls + optional AI use Node APIs and can take a few seconds.

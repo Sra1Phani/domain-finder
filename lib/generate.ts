@@ -6,8 +6,11 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import type { Suggestion, SuggestionSource } from "./types";
-import { DEFAULT_TLDS } from "./tlds";
+import {
+  DEFAULT_TLDS,
+  type Suggestion,
+  type SuggestionSource,
+} from "@domain-finder/core";
 import { domainHacks } from "./hacks";
 
 // --- label hygiene -----------------------------------------------------------
