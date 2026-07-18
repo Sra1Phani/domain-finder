@@ -4,6 +4,48 @@ Search and recommend good domain names to buy. Describe a product or idea; the
 app brainstorms brandable names (AI + rule-based combos), checks real
 availability via RDAP, and returns a **ranked** list of buy candidates.
 
+## Connect to the MCP server
+
+Domain Finder is also a **remote MCP server** — check a brand name across domains
+and the GitHub / npm / PyPI namespaces from any MCP-capable agent.
+
+- **Endpoint:** `https://domain-finder-theta.vercel.app/api/mcp` (Streamable HTTP)
+- **Tools:**
+  - `check_name` — check whether one or more candidate names are free across
+    domains and the GitHub / npm / PyPI namespaces, in a single call.
+  - `generate_names` — generate candidate names from a description, each
+    pre-checked for domain availability; feed the favorites into `check_name`.
+- **Read-only, and no credentials required** — nothing to sign up for, no keys
+  to paste. Safe to connect.
+
+**Cursor** (`~/.cursor/mcp.json`) and any client with native Streamable-HTTP
+support:
+
+```jsonc
+{
+  "mcpServers": {
+    "domain-finder": {
+      "type": "streamable-http",
+      "url": "https://domain-finder-theta.vercel.app/api/mcp"
+    }
+  }
+}
+```
+
+**Claude Desktop** (`claude_desktop_config.json`) — bridge a remote server with
+`mcp-remote`:
+
+```jsonc
+{
+  "mcpServers": {
+    "domain-finder": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://domain-finder-theta.vercel.app/api/mcp"]
+    }
+  }
+}
+```
+
 ## How it works
 
 ```

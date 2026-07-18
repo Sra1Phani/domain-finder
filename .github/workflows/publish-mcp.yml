@@ -1,0 +1,62 @@
+# Publish the domain-finder MCP server to the official MCP Registry on release.
+#
+# This is a REMOTE, hosted server (server.json uses `remotes`, no `packages`),
+# so there is NO npm publish — publishing here only updates the registry LISTING
+# that points at the already-deployed https://domain-finder-theta.vercel.app/api/mcp.
+# Deploying the app itself is handled separately (Vercel Git integration).
+#
+# Auth: GitHub OIDC, which matches the io.github.sra1phani/* namespace in
+# server.json — no secret needed, the OIDC token proves the action runs in this
+# repo. (If you switch server.json's `name` to a DNS-verified com.<domain>/*
+# namespace, replace the login step per the note below.)
+#
+# Trigger: pushing a version tag, e.g.  git tag v0.1.0 && git push origin v0.1.0
+
+name: publish-mcp
+
+on:
+  push:
+    tags: ["v*"]
+  # Allow a manual run from the Actions tab without cutting a tag.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for `mcp-publisher login github-oidc`
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "lts/*"
+
+      # Guard: don't publish a listing when the tree is broken.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      # --- Authenticate to the MCP Registry ---------------------------------
+      # GitHub OIDC — matches an io.github.<login>/* namespace. Zero secrets.
+      - name: Authenticate (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      #
+      # DNS alternative — if server.json's name is com.<your-domain>/domain-finder,
+      # comment out the step above and use this instead (store the Ed25519 private
+      # key as a repo secret; publish the matching TXT record on the domain):
+      #   - name: Authenticate (DNS)
+      #     run: ./mcp-publisher login dns --domain=<your-domain> --private-key=${{ secrets.MCP_DNS_PRIVATE_KEY }}
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
