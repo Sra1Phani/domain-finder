@@ -164,3 +164,21 @@ test("github: with no token, no Authorization header is sent", async () => {
   await githubProvider.check("octonewbie", deps);
   assert.equal(seen?.authorization, undefined);
 });
+
+test("github: a reserved login is invalid WITHOUT calling the API (no false available)", async () => {
+  const { deps, calls } = depsReturning(() => res(404)); // API would say "available"
+  for (const reserved of ["settings", "about", "Security", "PRICING"]) {
+    const r = await githubProvider.check(reserved, deps);
+    assert.equal(r.status, "invalid", `${reserved} must be invalid, not available`);
+  }
+  assert.equal(calls.length, 0, "reserved names never hit the API");
+});
+
+test("npm: scoped input (@scope/name or containing a slash) is invalid, no API call", async () => {
+  const { deps, calls } = depsReturning(() => res(404));
+  const scoped = await npmProvider.check("@angular/core", deps);
+  assert.equal(scoped.status, "invalid");
+  const slashed = await npmProvider.check("foo/bar", deps);
+  assert.equal(slashed.status, "invalid");
+  assert.equal(calls.length, 0, "scoped names never hit the registry");
+});

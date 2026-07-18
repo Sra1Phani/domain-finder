@@ -71,6 +71,14 @@ export const npmProvider: NamespaceProvider = {
   normalize: normalizeNpm,
   async check(name, deps) {
     const normalized = normalizeNpm(name);
+
+    // Scoped input (@scope/name, or anything with a slash) is out of this cut's
+    // scope: URL-encoding the "/" would query a garbage path and could 404 into
+    // a false "available". A scoped name is not a plain package name — "invalid".
+    if (name.startsWith("@") || name.includes("/")) {
+      return make("npm", name, normalized, "invalid", deps.now);
+    }
+
     const url = `https://www.npmjs.com/package/${normalized}`;
     try {
       const res = await deps.fetch(
@@ -120,6 +128,20 @@ function isValidGithubLogin(name: string): boolean {
   return name.length >= 1 && name.length <= 39 && GITHUB_LOGIN_RE.test(name);
 }
 
+// GitHub reserves a set of logins for its own routes (github.com/<here>). The
+// /users API 404s for them — which the naive model would read as "available" —
+// but they can never be registered. Surfaced by the cross-namespace live check;
+// this is a "don't fabricate available" guard. Case-insensitive.
+const GITHUB_RESERVED = new Set([
+  "about", "account", "admin", "api", "assets", "blog", "business", "contact",
+  "dashboard", "developer", "docs", "download", "downloads", "enterprise",
+  "events", "explore", "features", "help", "home", "issues", "jobs", "join",
+  "login", "logout", "marketplace", "mobile", "new", "news", "notifications",
+  "organizations", "pages", "plans", "pricing", "privacy", "pulls", "register",
+  "search", "security", "settings", "shop", "signup", "sponsors", "status",
+  "support", "team", "teams", "terms", "tos", "training", "watching", "wiki",
+]);
+
 const normalizeGithub = (name: string): string => name.toLowerCase();
 
 export const githubProvider: NamespaceProvider = {
@@ -129,8 +151,8 @@ export const githubProvider: NamespaceProvider = {
     const normalized = normalizeGithub(name);
 
     // Short-circuit invalid names WITHOUT touching the API — a name unusable on
-    // GitHub is not "free" there.
-    if (!isValidGithubLogin(name)) {
+    // GitHub is not "free" there. Format failures and reserved logins both count.
+    if (!isValidGithubLogin(name) || GITHUB_RESERVED.has(normalized)) {
       return make("github", name, normalized, "invalid", deps.now);
     }
 

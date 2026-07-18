@@ -33,6 +33,7 @@ import {
   type NamespaceDeps,
   type NamespaceProvider,
 } from "./namespace";
+import { checkBrand, type BrandOptions, type BrandResult } from "./brand";
 import { createMemoryCache, type CacheStore } from "./cache";
 import type {
   AvailabilityResult,
@@ -79,6 +80,8 @@ export type Core = {
   namespaceProviders: Record<Surface, NamespaceProvider>;
   /** Check a label across surfaces (defaults to all three). */
   checkNamespaces(name: string, surfaces?: Surface[]): Promise<NamespaceResult[]>;
+  /** Compose domain + namespace availability for a single brand name. */
+  checkBrand(name: string, opts?: BrandOptions): Promise<BrandResult>;
   /** The cache store in use — exposed so surfaces/tests can inspect or reset. */
   cache: CacheStore;
 };
@@ -126,6 +129,13 @@ export function createCore(deps: CoreDeps): Core {
   const doCheckNamespaces = (name: string, surfaces: Surface[] = ALL_SURFACES) =>
     checkNamespaces(name, surfaces, nsDeps, namespaceProviders);
 
+  const doCheckBrand = (name: string, opts: BrandOptions = {}) =>
+    checkBrand(name, opts, {
+      // Discovery benefits from the cached domain provider.
+      checkDomains: (domains) => many(domains),
+      checkNamespaces: doCheckNamespaces,
+    });
+
   return {
     provider,
     rawProvider,
@@ -135,6 +145,7 @@ export function createCore(deps: CoreDeps): Core {
     search,
     namespaceProviders,
     checkNamespaces: doCheckNamespaces,
+    checkBrand: doCheckBrand,
     cache,
   };
 }

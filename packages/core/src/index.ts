@@ -16,6 +16,7 @@ export * from "./cache";
 export * from "./pool";
 export * from "./availability";
 export * from "./namespace";
+export * from "./brand";
 export * from "./hacks";
 export * from "./generate";
 export * from "./search";
