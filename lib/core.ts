@@ -26,6 +26,9 @@ const core = createCore({
     aiApiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
   },
   generateObject,
+  // GitHub namespace checks: the token is read HERE (surface), injected into
+  // core. Without it, GitHub is limited to 60 req/hr per IP; with it, 5000/hr.
+  githubToken: process.env.GITHUB_TOKEN,
 });
 
 // Search benefits from the per-domain availability cache (core.provider).
@@ -35,3 +38,7 @@ export const search = core.search;
 // the uncached provider — preserving their pre-refactor behavior. (It still
 // shares the long-lived IANA bootstrap cache.)
 export const availabilityProvider = core.rawProvider;
+
+// Cross-namespace availability (github/npm/pypi), cache-wrapped with the
+// injected token. Surface API for a future route/MCP tool.
+export const checkNamespaces = core.checkNamespaces;

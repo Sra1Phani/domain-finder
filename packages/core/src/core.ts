@@ -22,8 +22,25 @@ import {
   type GenerateResult,
 } from "./generate";
 import { runSearch } from "./search";
+import {
+  checkNamespaces,
+  githubProvider,
+  npmProvider,
+  pypiProvider,
+  withNamespaceCache,
+  DEFAULT_NAMESPACE_TTLS,
+  type NamespaceCacheTtls,
+  type NamespaceDeps,
+  type NamespaceProvider,
+} from "./namespace";
 import { createMemoryCache, type CacheStore } from "./cache";
-import type { AvailabilityResult, SearchRequest, SearchResponse } from "./types";
+import type {
+  AvailabilityResult,
+  NamespaceResult,
+  SearchRequest,
+  SearchResponse,
+  Surface,
+} from "./types";
 
 export type CoreDeps = {
   /**
@@ -41,6 +58,10 @@ export type CoreDeps = {
   generateObject?: GenerateObjectFn;
   /** TTLs for the per-domain availability cache. */
   ttls?: AvailabilityCacheTtls;
+  /** Optional GitHub token for namespace checks — injected, never read from env. */
+  githubToken?: string;
+  /** TTLs for the namespace (github/npm/pypi) cache. */
+  namespaceTtls?: NamespaceCacheTtls;
 };
 
 export type Core = {
@@ -54,9 +75,15 @@ export type Core = {
   checkMany(domains: string[], concurrency?: number): Promise<AvailabilityResult[]>;
   generateSuggestions(query: string, opts?: GenerateOptions): Promise<GenerateResult>;
   search(req: SearchRequest): Promise<SearchResponse>;
+  /** Cache-wrapped namespace providers, keyed by surface. */
+  namespaceProviders: Record<Surface, NamespaceProvider>;
+  /** Check a label across surfaces (defaults to all three). */
+  checkNamespaces(name: string, surfaces?: Surface[]): Promise<NamespaceResult[]>;
   /** The cache store in use — exposed so surfaces/tests can inspect or reset. */
   cache: CacheStore;
 };
+
+const ALL_SURFACES: Surface[] = ["github", "npm", "pypi"];
 
 export function createCore(deps: CoreDeps): Core {
   const now = deps.now ?? (() => new Date());
@@ -87,6 +114,18 @@ export function createCore(deps: CoreDeps): Core {
       now,
     });
 
+  // Namespace (github/npm/pypi): cache-wrapped providers over the same store,
+  // and deps carrying the injected github token.
+  const nsTtls = deps.namespaceTtls ?? DEFAULT_NAMESPACE_TTLS;
+  const nsDeps: NamespaceDeps = { fetch: fetchFn, now, githubToken: deps.githubToken };
+  const namespaceProviders: Record<Surface, NamespaceProvider> = {
+    github: withNamespaceCache(githubProvider, cache, nsTtls),
+    npm: withNamespaceCache(npmProvider, cache, nsTtls),
+    pypi: withNamespaceCache(pypiProvider, cache, nsTtls),
+  };
+  const doCheckNamespaces = (name: string, surfaces: Surface[] = ALL_SURFACES) =>
+    checkNamespaces(name, surfaces, nsDeps, namespaceProviders);
+
   return {
     provider,
     rawProvider,
@@ -94,6 +133,8 @@ export function createCore(deps: CoreDeps): Core {
     checkMany: many,
     generateSuggestions: gen,
     search,
+    namespaceProviders,
+    checkNamespaces: doCheckNamespaces,
     cache,
   };
 }

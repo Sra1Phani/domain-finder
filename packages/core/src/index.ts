@@ -13,6 +13,7 @@ export * from "./rdap-status";
 export * from "./rank";
 export * from "./cadence";
 export * from "./cache";
+export * from "./pool";
 export * from "./availability";
 export * from "./namespace";
 export * from "./hacks";

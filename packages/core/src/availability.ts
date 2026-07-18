@@ -14,6 +14,7 @@
 import { bucketFor, interpretRegistered, type RdapDomain } from "./rdap-status";
 import type { AvailabilityResult, AvailabilityStatus } from "./types";
 import type { CacheStore } from "./cache";
+import { mapPool } from "./pool";
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -235,20 +236,5 @@ export async function checkMany(
   concurrency: number,
   provider: AvailabilityProvider,
 ): Promise<AvailabilityResult[]> {
-  const out = new Array<AvailabilityResult>(domains.length);
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < domains.length) {
-      const i = cursor++;
-      out[i] = await provider.check(domains[i]);
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, domains.length) },
-    worker,
-  );
-  await Promise.all(workers);
-  return out;
+  return mapPool(domains, concurrency, (d) => provider.check(d));
 }

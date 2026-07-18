@@ -11,6 +11,8 @@
 
 import type { NamespaceResult, NamespaceStatus, Surface } from "./types";
 import type { FetchLike } from "./availability";
+import type { CacheStore } from "./cache";
+import { mapPool } from "./pool";
 
 export type NamespaceDeps = {
   fetch: FetchLike;
@@ -22,6 +24,8 @@ export type NamespaceDeps = {
 
 export interface NamespaceProvider {
   readonly surface: Surface;
+  /** The surface-normalized form of a name — also the cache key component. */
+  normalize(name: string): string;
   check(name: string, deps: NamespaceDeps): Promise<NamespaceResult>;
 }
 
@@ -60,10 +64,13 @@ function statusFromResponse(status: number): NamespaceStatus {
 
 // --- npm ---------------------------------------------------------------------
 
+const normalizeNpm = (name: string): string => name.toLowerCase();
+
 export const npmProvider: NamespaceProvider = {
   surface: "npm",
+  normalize: normalizeNpm,
   async check(name, deps) {
-    const normalized = name.toLowerCase();
+    const normalized = normalizeNpm(name);
     const url = `https://www.npmjs.com/package/${normalized}`;
     try {
       const res = await deps.fetch(
@@ -86,6 +93,7 @@ function normalizePypi(name: string): string {
 
 export const pypiProvider: NamespaceProvider = {
   surface: "pypi",
+  normalize: normalizePypi,
   async check(name, deps) {
     const normalized = normalizePypi(name);
     const url = `https://pypi.org/project/${normalized}/`;
@@ -112,10 +120,13 @@ function isValidGithubLogin(name: string): boolean {
   return name.length >= 1 && name.length <= 39 && GITHUB_LOGIN_RE.test(name);
 }
 
+const normalizeGithub = (name: string): string => name.toLowerCase();
+
 export const githubProvider: NamespaceProvider = {
   surface: "github",
+  normalize: normalizeGithub,
   async check(name, deps) {
-    const normalized = name.toLowerCase();
+    const normalized = normalizeGithub(name);
 
     // Short-circuit invalid names WITHOUT touching the API — a name unusable on
     // GitHub is not "free" there.
@@ -166,3 +177,81 @@ export const NAMESPACE_PROVIDERS: Record<Surface, NamespaceProvider> = {
   npm: npmProvider,
   pypi: pypiProvider,
 };
+
+// --- caching -----------------------------------------------------------------
+
+export type NamespaceCacheTtls = {
+  /** SHORT — a handle can be grabbed at any moment; a stale free is the danger. */
+  availableSeconds: number;
+  /** Longer — a taken name rarely frees up. */
+  takenSeconds: number;
+  /** Long — "invalid" is deterministic from the name, it won't change. */
+  invalidSeconds: number;
+};
+
+export const DEFAULT_NAMESPACE_TTLS: NamespaceCacheTtls = {
+  availableSeconds: 60,
+  takenSeconds: 3_600,
+  invalidSeconds: 86_400,
+};
+
+/**
+ * TTL for a namespace result by status. `unknown` is NEVER cached — the same
+ * rule as the domain path: don't pin a "we couldn't tell".
+ */
+function ttlForNamespace(status: NamespaceStatus, ttls: NamespaceCacheTtls): number {
+  switch (status) {
+    case "available":
+      return ttls.availableSeconds;
+    case "taken":
+      return ttls.takenSeconds;
+    case "invalid":
+      return ttls.invalidSeconds;
+    case "unknown":
+      return 0; // never cache
+  }
+}
+
+/**
+ * Wrap a provider with a read-through cache keyed by (surface + normalized
+ * name). Pass `noopCache` to disable.
+ */
+export function withNamespaceCache(
+  inner: NamespaceProvider,
+  cache: CacheStore,
+  ttls: NamespaceCacheTtls = DEFAULT_NAMESPACE_TTLS,
+): NamespaceProvider {
+  return {
+    surface: inner.surface,
+    normalize: inner.normalize,
+    async check(name, deps) {
+      const key = `ns:${inner.surface}:${inner.normalize(name)}`;
+      const cached = (await cache.get(key)) as NamespaceResult | undefined;
+      if (cached) return cached;
+      const fresh = await inner.check(name, deps);
+      await cache.set(key, fresh, ttlForNamespace(fresh.status, ttls));
+      return fresh;
+    },
+  };
+}
+
+// --- coordinator -------------------------------------------------------------
+
+/** Ceiling on concurrent surface checks. Small: there are few surfaces. */
+const NAMESPACE_CONCURRENCY = 6;
+
+/**
+ * Fan a single name out across the requested surfaces with bounded concurrency,
+ * returning one result per surface (order matches `surfaces`). Providers default
+ * to the uncached set; createCore passes the cache-wrapped providers.
+ */
+export async function checkNamespaces(
+  name: string,
+  surfaces: Surface[],
+  deps: NamespaceDeps,
+  providers: Record<Surface, NamespaceProvider> = NAMESPACE_PROVIDERS,
+): Promise<NamespaceResult[]> {
+  return mapPool(surfaces, NAMESPACE_CONCURRENCY, (surface) =>
+    providers[surface].check(name, deps),
+  );
+}
