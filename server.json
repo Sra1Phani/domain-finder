@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.sra1phani/domain-finder",
+  "name": "io.github.Sra1Phani/domain-finder",
   "title": "Domain Finder",
   "description": "Check if a brand name is free across domains, GitHub, npm and PyPI, and suggest available names.",
   "version": "0.1.0",

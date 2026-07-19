@@ -5,7 +5,7 @@
 # that points at the already-deployed https://domain-finder-theta.vercel.app/api/mcp.
 # Deploying the app itself is handled separately (Vercel Git integration).
 #
-# Auth: GitHub OIDC, which matches the io.github.sra1phani/* namespace in
+# Auth: GitHub OIDC, which matches the io.github.Sra1Phani/* namespace in
 # server.json — no secret needed, the OIDC token proves the action runs in this
 # repo. (If you switch server.json's `name` to a DNS-verified com.<domain>/*
 # namespace, replace the login step per the note below.)
