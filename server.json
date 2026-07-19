@@ -5,6 +5,11 @@
   "description": "Check if a brand name is free across domains, GitHub, npm and PyPI, and suggest available names.",
   "version": "0.1.0",
   "websiteUrl": "https://domain-finder-theta.vercel.app",
+  "repository": {
+    "url": "https://github.com/Sra1Phani/domain-finder",
+    "source": "github",
+    "id": "R_kgDOTbvIkA"
+  },
   "remotes": [
     {
       "type": "streamable-http",
