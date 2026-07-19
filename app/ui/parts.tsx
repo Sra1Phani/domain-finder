@@ -46,8 +46,7 @@ export function StatusPill({ status, label }: { status: string; label?: string }
         borderRadius: 999,
         color: S.text,
         background: S.bg,
-        border: `1px solid ${S.border}`,
-        borderStyle: isDashed(status) ? "dashed" : "solid",
+        border: `1px ${isDashed(status) ? "dashed" : "solid"} ${S.border}`,
       }}
     >
       <StatusDot status={status} size={15} />
@@ -83,9 +82,8 @@ export function StatusTile({
         animation: "cl-pop .34s ease both",
         borderRadius: 10,
         padding: "9px 10px 8px",
-        border: `1px solid ${S.border}`,
+        border: `1px ${isDashed(status) ? "dashed" : "solid"} ${S.border}`,
         background: S.bg,
-        borderStyle: isDashed(status) ? "dashed" : "solid",
         backgroundImage: invalid
           ? `repeating-linear-gradient(135deg, ${S.bg}, ${S.bg} 5px, color-mix(in oklch, ${S.solid} 9%, ${S.bg}) 5px, color-mix(in oklch, ${S.solid} 9%, ${S.bg}) 7px)`
           : "none",

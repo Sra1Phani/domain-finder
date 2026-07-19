@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Header } from "./Header";
 import { Home } from "./Home";
+import { Check } from "./Check";
 import { T, FONT_DISPLAY, FONT_MONO, radius } from "@/lib/ui/tokens";
 
 type View = "home" | "check" | "generate" | "watch";
@@ -36,7 +37,8 @@ function Stub({ title, note }: { title: string; note: string }) {
 export default function App() {
   const [view, setView] = useState<View>("home");
   // Name routed in from the home Check door or (later) a Generate candidate.
-  const [, setQueued] = useState<string | null>(null);
+  const [queued, setQueued] = useState<string | null>(null);
+  const consumeQueued = useCallback(() => setQueued(null), []);
 
   const goCheck = (name?: string) => {
     if (name) setQueued(name);
@@ -63,9 +65,7 @@ export default function App() {
         {view === "home" && (
           <Home onGenerate={() => setView("generate")} onCheck={(n) => goCheck(n)} onWatch={() => setView("watch")} />
         )}
-        {view === "check" && (
-          <Stub title="Check a name across every surface" note="The live streaming reveal wires up in the next commit." />
-        )}
+        {view === "check" && <Check queuedName={queued} onConsumeQueued={consumeQueued} />}
         {view === "generate" && (
           <Stub title="Describe it — the names come to you" note="Candidate generation wires up in a following commit." />
         )}
