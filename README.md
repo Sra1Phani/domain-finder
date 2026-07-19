@@ -4,6 +4,8 @@ Search and recommend good domain names to buy. Describe a product or idea; the
 app brainstorms brandable names (AI + rule-based combos), checks real
 availability via RDAP, and returns a **ranked** list of buy candidates.
 
+Source-available under the **Elastic License 2.0** (`SPDX-License-Identifier: Elastic-2.0`) — see [License](#license).
+
 ## Connect to the MCP server
 
 Domain Finder is also a **remote MCP server** — check a brand name across domains
@@ -221,3 +223,11 @@ See [Watchlist](#watchlist) above.
 - **You can't win a drop by polling this app.** Professional drop-catchers hold
   hundreds of registrar connections. The useful build is a watchlist that alerts
   and hands off to a backorder service — see the wiki for the design.
+
+## License
+
+Source-available under the **Elastic License 2.0** (`SPDX-License-Identifier:
+Elastic-2.0`). You may inspect, self-host, and modify the code freely. What
+you may **not** do is provide it to third parties as a hosted or managed
+service that exposes a substantial set of its features — i.e. running it as a
+competing hosted service is not permitted. Full terms in [LICENSE](LICENSE).
