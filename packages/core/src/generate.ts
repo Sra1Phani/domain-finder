@@ -132,7 +132,11 @@ async function aiLabels(
                 .describe(
                   "brandable second-level label, lowercase, letters/digits/hyphens only, NO TLD",
                 ),
-              rationale: z.string().describe("<= 12 words on why it fits"),
+              rationale: z
+                .string()
+                .describe(
+                  "<= 14 words tying the name to THIS idea — reference a word or the meaning from the description, not generic praise",
+                ),
             }),
           )
           .max(count),
@@ -143,7 +147,9 @@ async function aiLabels(
         `"${query}"\n\n` +
         `Rules: short (aim <= 15 chars), easy to spell and say, lowercase, ` +
         `letters and digits only, avoid hyphens unless they clearly help. ` +
-        `Mix literal descriptors with inventive/coined names.`,
+        `Mix literal descriptors with inventive/coined names. For each name, the ` +
+        `rationale must connect it specifically to this idea (reference a keyword ` +
+        `or the meaning above) — avoid generic praise like "brandable and catchy".`,
     });
     return object.names.map((n) => ({ label: n.name, rationale: n.rationale }));
   } catch {
@@ -200,8 +206,14 @@ export async function generateSuggestions(
     const n = normalizeLabel(r.label);
     if (n && !labels.has(n)) labels.set(n, { source: "ai", rationale: r.rationale });
   }
+  // Rule-based labels get an idea-specific rationale (references a keyword from
+  // the description), not generic praise — mirroring what we ask the AI for.
+  const kws = keywords(query);
+  const ruleRationale = kws.length
+    ? `Built from "${kws[0]}" in your idea — familiar and quick to say.`
+    : undefined;
   for (const l of ruleBasedLabels(query)) {
-    if (!labels.has(l)) labels.set(l, { source: "rule" });
+    if (!labels.has(l)) labels.set(l, { source: "rule", rationale: ruleRationale });
   }
 
   const ordered = [...labels.entries()].slice(0, maxLabels);

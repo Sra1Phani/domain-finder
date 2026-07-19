@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Header } from "./Header";
 import { Home } from "./Home";
 import { Check } from "./Check";
+import { Generate } from "./Generate";
 import { T, FONT_DISPLAY, FONT_MONO, radius } from "@/lib/ui/tokens";
 
 type View = "home" | "check" | "generate" | "watch";
@@ -66,9 +67,7 @@ export default function App() {
           <Home onGenerate={() => setView("generate")} onCheck={(n) => goCheck(n)} onWatch={() => setView("watch")} />
         )}
         {view === "check" && <Check queuedName={queued} onConsumeQueued={consumeQueued} />}
-        {view === "generate" && (
-          <Stub title="Describe it — the names come to you" note="Candidate generation wires up in a following commit." />
-        )}
+        {view === "generate" && <Generate onCheckName={(n) => goCheck(n)} />}
         {view === "watch" && (
           <Stub
             title="Watchlist"

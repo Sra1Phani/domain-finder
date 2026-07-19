@@ -57,3 +57,19 @@ test("domain hacks are produced from the query's own words", async () => {
   const hacks = suggestions.filter((s) => s.source === "hack").map((s) => s.domain);
   assert.ok(hacks.includes("bit.ly"), `expected bit.ly among ${JSON.stringify(hacks)}`);
 });
+
+test("rule-based candidates carry an idea-specific rationale (references a query keyword)", async () => {
+  const core = createCore({ fetch: notFound, config: {} });
+  const { suggestions } = await core.generateSuggestions("a recipe sharing app for home cooks", {
+    useAi: false,
+    useHacks: false,
+  });
+  const rule = suggestions.filter((s) => s.source === "rule");
+  assert.ok(rule.length > 0);
+  // Every rule rationale ties to a real keyword from the idea — not generic praise.
+  for (const s of rule) {
+    assert.ok(s.rationale, "rule candidates should carry a rationale");
+    assert.match(s.rationale!, /recipe/, `rationale should reference the idea keyword: ${s.rationale}`);
+    assert.doesNotMatch(s.rationale!, /brandable and catchy/i);
+  }
+});
