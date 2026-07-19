@@ -8,6 +8,7 @@
 // forbidden import or a process.env read anywhere under packages/core.
 
 export * from "./types";
+export * from "./strings";
 export * from "./tlds";
 export * from "./rdap-status";
 export * from "./rank";
