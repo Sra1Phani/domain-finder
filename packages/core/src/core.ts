@@ -33,7 +33,13 @@ import {
   type NamespaceDeps,
   type NamespaceProvider,
 } from "./namespace";
-import { checkBrand, type BrandOptions, type BrandResult } from "./brand";
+import {
+  checkBrand,
+  streamBrand,
+  type BrandOptions,
+  type BrandResult,
+  type BrandStreamEvent,
+} from "./brand";
 import { createMemoryCache, type CacheStore } from "./cache";
 import type {
   AvailabilityResult,
@@ -82,6 +88,8 @@ export type Core = {
   checkNamespaces(name: string, surfaces?: Surface[]): Promise<NamespaceResult[]>;
   /** Compose domain + namespace availability for a single brand name. */
   checkBrand(name: string, opts?: BrandOptions): Promise<BrandResult>;
+  /** Same fan-out as checkBrand, streamed: each result yielded as it settles. */
+  streamBrand(name: string, opts?: BrandOptions): AsyncGenerator<BrandStreamEvent>;
   /** The cache store in use — exposed so surfaces/tests can inspect or reset. */
   cache: CacheStore;
 };
@@ -136,6 +144,12 @@ export function createCore(deps: CoreDeps): Core {
       checkNamespaces: doCheckNamespaces,
     });
 
+  const doStreamBrand = (name: string, opts: BrandOptions = {}) =>
+    streamBrand(name, opts, {
+      checkDomain: (domain) => provider.check(domain),
+      checkNamespace: (n, surface) => namespaceProviders[surface].check(n, nsDeps),
+    });
+
   return {
     provider,
     rawProvider,
@@ -146,6 +160,7 @@ export function createCore(deps: CoreDeps): Core {
     namespaceProviders,
     checkNamespaces: doCheckNamespaces,
     checkBrand: doCheckBrand,
+    streamBrand: doStreamBrand,
     cache,
   };
 }

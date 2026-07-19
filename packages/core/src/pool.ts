@@ -25,3 +25,41 @@ export async function mapPool<T, R>(
   await Promise.all(workers);
   return out;
 }
+
+/**
+ * Run `thunks` with bounded concurrency and yield each result **in completion
+ * order** — the fastest-settling first, regardless of input order. Unlike
+ * mapPool (which awaits the whole batch and preserves input order), this drains
+ * as each promise settles, so a consumer sees fast results immediately.
+ *
+ * Tags each in-flight promise with its id, races the active set, yields the
+ * settled one, and launches the next — keeping at most `concurrency` in flight.
+ * Rejections propagate (callers whose thunks never reject — e.g. providers that
+ * catch internally — get a clean stream).
+ */
+export async function* streamSettled<T>(
+  thunks: Array<() => Promise<T>>,
+  concurrency: number,
+): AsyncGenerator<T> {
+  let next = 0;
+  const active = new Map<number, Promise<{ id: number; value: T }>>();
+
+  const launch = () => {
+    if (next >= thunks.length) return;
+    const id = next++;
+    active.set(
+      id,
+      thunks[id]().then((value) => ({ id, value })),
+    );
+  };
+
+  const start = Math.min(Math.max(concurrency, 1), thunks.length);
+  for (let i = 0; i < start; i++) launch();
+
+  while (active.size > 0) {
+    const { id, value } = await Promise.race(active.values());
+    active.delete(id);
+    yield value;
+    launch();
+  }
+}
