@@ -4,9 +4,9 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { toCandidates, type GenerateCandidate } from "@/lib/generate-dto";
 import type { SearchResponse } from "@domain-finder/core";
-import { SourceTag, StatusDot } from "./parts";
+import { SourceTag, StatusDot, TldChips } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
-import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS } from "@/lib/ui/tokens";
+import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
 const VIBES = ["Any", "Playful", "Serious", "Techy"];
 
@@ -35,6 +35,12 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ran, setRan] = useState(false);
+  const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
+
+  const toggleTld = (tld: string) =>
+    setTlds((prev) =>
+      prev.includes(tld) ? (prev.length > 1 ? prev.filter((t) => t !== tld) : prev) : [...prev, tld],
+    );
 
   async function runGenerate() {
     const query = description.trim();
@@ -46,7 +52,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query, useAi: true, useHacks: true }),
+        body: JSON.stringify({ query, useAi: true, useHacks: true, tlds }),
       });
       if (!res.ok) {
         setError(`Generation failed (${res.status}).`);
@@ -115,7 +121,10 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
             minHeight: 74,
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", borderTop: `1px solid ${T.line}`, paddingTop: 12, marginTop: 4 }}>
+        <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12, marginTop: 4 }}>
+          <TldChips selected={tlds} onToggle={toggleTld} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingTop: 12, marginTop: 4 }}>
           {/* Steering (vibe / short) isn't a /api/search parameter yet — rendered
               inactive rather than faking an effect. */}
           <span style={{ fontSize: 11, color: T.faint, fontFamily: FONT_MONO, textTransform: "uppercase", letterSpacing: ".05em" }} title="Steering arrives in a later stage">

@@ -5,7 +5,57 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { statusStyle, isDashed } from "@/lib/ui/status";
-import { T, FONT_DISPLAY, FONT_MONO, radiusS } from "@/lib/ui/tokens";
+import { T, FONT_DISPLAY, FONT_MONO, radiusS, TLD_OPTIONS } from "@/lib/ui/tokens";
+
+/** Multi-select TLD chips. Keeps at least one selected (empty would silently
+ * fall back to the backend default, which is confusing). */
+export function TldChips({
+  selected,
+  onToggle,
+}: {
+  selected: string[];
+  onToggle: (tld: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: T.faint,
+          fontFamily: FONT_MONO,
+          textTransform: "uppercase",
+          letterSpacing: ".05em",
+        }}
+      >
+        TLDs
+      </span>
+      {TLD_OPTIONS.map((tld) => {
+        const on = selected.includes(tld);
+        return (
+          <button
+            key={tld}
+            type="button"
+            onClick={() => onToggle(tld)}
+            aria-pressed={on}
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 12.5,
+              fontWeight: on ? 600 : 500,
+              padding: "5px 11px",
+              borderRadius: 999,
+              cursor: "pointer",
+              border: `1px solid ${on ? T.brand : T.line}`,
+              background: on ? T.brand : T.card,
+              color: on ? "#fff" : T.muted,
+            }}
+          >
+            {tld}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function StatusDot({ status, size = 17 }: { status: string; size?: number }) {
   const S = statusStyle(status);

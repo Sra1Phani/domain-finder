@@ -9,9 +9,9 @@ import {
   type CheckNameState,
 } from "@/lib/check-stream";
 import type { CheckEvent } from "@/lib/check-events";
-import { StatusTile, SurfaceRow, VerdictPill, GroupLabel } from "./parts";
+import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
-import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS } from "@/lib/ui/tokens";
+import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
 const EXAMPLES = ["namescope", "quillbase", "fathomly", "orbitkit", "lumen"];
 
@@ -26,8 +26,14 @@ export function Check({
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
+  const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
   const [deferred, setDeferred] = useState<number | null>(null);
   const seq = useRef(0);
+
+  const toggleTld = (tld: string) =>
+    setTlds((prev) =>
+      prev.includes(tld) ? (prev.length > 1 ? prev.filter((t) => t !== tld) : prev) : [...prev, tld],
+    );
   // Synchronous dedupe guard — survives StrictMode's double-invoked effects
   // (a closure check on `entries` would see stale [] twice and duplicate).
   const active = useRef<Set<string>>(new Set());
@@ -35,12 +41,12 @@ export function Check({
   const update = (id: number, fn: (s: CheckNameState) => CheckNameState) =>
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, state: fn(e.state) } : e)));
 
-  async function runCheck(id: number, name: string) {
+  async function runCheck(id: number, name: string, checkTlds: string[]) {
     try {
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, tlds: checkTlds }),
       });
       if (!res.ok || !res.body) {
         update(id, (s) => applyCheckEvent(s, { kind: "error", message: `Check failed (${res.status})` }));
@@ -69,7 +75,7 @@ export function Check({
     active.current.add(name);
     const id = ++seq.current;
     setEntries((prev) => [{ id, name, state: initialNameState(name) }, ...prev]);
-    void runCheck(id, name);
+    void runCheck(id, name, tlds);
   }
 
   function removeEntry(id: number, name: string) {
@@ -215,6 +221,10 @@ export function Check({
             Clear all
           </button>
         )}
+      </div>
+
+      <div style={{ marginTop: 14, maxWidth: 640 }}>
+        <TldChips selected={tlds} onToggle={toggleTld} />
       </div>
 
       {entries.length === 0 ? (

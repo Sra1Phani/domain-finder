@@ -33,3 +33,9 @@ export const radiusS = `${RADIUS_S}px`;
 // real brand in here; the design's "Clearance" was mock and is intentionally
 // not used.
 export const WORDMARK = "namecheck";
+
+// TLD options offered in the Check/Generate selectors (with leading dot). Both
+// backends accept the `tlds` param — /api/search wants the dot, streamBrand
+// strips it — so passing the dotted form works for both.
+export const TLD_OPTIONS = [".com", ".io", ".ai", ".co", ".app", ".dev", ".xyz", ".me"];
+export const DEFAULT_TLDS_UI = [".com", ".io", ".dev", ".app", ".ai"];
