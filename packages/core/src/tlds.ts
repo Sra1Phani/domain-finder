@@ -28,3 +28,30 @@ const WEIGHTS = new Map(TLDS.map((t) => [t.tld, t.weight]));
 export function tldWeight(tld: string): number {
   return WEIGHTS.get(tld.toLowerCase()) ?? 0.4;
 }
+
+// Tier-1 acquirability: a static list of TLDs that are brand-operated or
+// otherwise not open for general registration. A name can read as "available"
+// on RDAP-style checks yet be impossible to actually register here — flagging
+// it fixes the "reads nice, can't get it" case. This is a curated static set,
+// not an exhaustive registry; pricing/aftermarket data stays a null slot.
+export const RESTRICTED_TLDS: readonly string[] = [
+  ".gov",
+  ".mil",
+  ".int",
+  ".edu",
+  ".google",
+  ".gle",
+  ".aws",
+  ".amazon",
+  ".apple",
+  ".microsoft",
+  ".map", // Google-operated brand TLD
+];
+
+const RESTRICTED_SET = new Set(RESTRICTED_TLDS);
+
+/** Whether a TLD is brand-operated/restricted (leading dot optional). */
+export function isRestrictedTld(tld: string): boolean {
+  const t = tld.toLowerCase();
+  return RESTRICTED_SET.has(t.startsWith(".") ? t : `.${t}`);
+}

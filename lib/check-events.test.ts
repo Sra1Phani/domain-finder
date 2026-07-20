@@ -66,10 +66,18 @@ test("domain statuses map to the UI status set; unknown stays unknown", () => {
     assert.equal(ev.status, ui, `${core} -> ${ui}`);
     assert.equal(ev.tld, ".com");
     assert.equal(ev.label, "acme.com");
-    // forward slots present-but-null
+    // acquire is still a forward slot (null); restricted is now wired and
+    // resolves to false for an ordinary registrable TLD like .com.
     assert.equal(ev.acquire, null);
-    assert.equal(ev.restricted, null);
+    assert.equal(ev.restricted, false);
   }
+});
+
+test("restricted is true for a brand-operated TLD, false for a normal one", () => {
+  const restricted = toCheckEvent(domResult("acme.map", avail("acme.map", "available"))) as CheckSurfaceEvent;
+  assert.equal(restricted.restricted, true);
+  const normal = toCheckEvent(domResult("acme.io", avail("acme.io", "available"))) as CheckSurfaceEvent;
+  assert.equal(normal.restricted, false);
 });
 
 test("domain expiry is surfaced when known, else null", () => {

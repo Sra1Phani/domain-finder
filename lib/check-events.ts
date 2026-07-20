@@ -14,6 +14,7 @@ import type {
   NamespaceStatus,
   Surface,
 } from "@domain-finder/core";
+import { isRestrictedTld } from "@domain-finder/core";
 
 export type CheckStatus = "available" | "taken" | "parked" | "unknown" | "invalid";
 
@@ -94,17 +95,20 @@ export function toCheckEvent(event: BrandStreamEvent): CheckEvent {
   // result
   if (event.type === "domain") {
     const r = event.result;
+    const tld = tldOf(event.surface);
     return {
       kind: "result",
       type: "domain",
       surface: event.surface,
       label: event.surface,
       status: domainStatus(r.status),
-      tld: tldOf(event.surface),
+      tld,
       url: null,
       expiry: r.expiresAt ?? null,
-      restricted: null, // forward slot
-      acquire: null, // forward slot
+      // Tier-1 acquirability: brand-operated/restricted TLDs can't be registered
+      // even when they read as available. Everything else stays null (unknown).
+      restricted: tld ? isRestrictedTld(tld) : null,
+      acquire: null, // forward slot — premium/for-sale/price not wired
     };
   }
 

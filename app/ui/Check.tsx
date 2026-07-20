@@ -10,22 +10,11 @@ import {
 } from "@/lib/check-stream";
 import type { CheckEvent } from "@/lib/check-events";
 import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips } from "./parts";
+import { Detail } from "./Detail";
 import { useWatchlist } from "./watchlist-context";
+import { watchTargetOf } from "@/lib/detail";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
-
-/** The domain a "Watch" affordance should monitor: the first taken/parked
- * domain surface, preferring .com. Watches are domain-only, so a name whose
- * domains are all free (only a registry is taken) has no watch target. */
-function watchTargetOf(
-  surfaces: { surface: string; type: "domain" | "registry"; status: string }[],
-): { domain: string; status: string } | null {
-  const domains = surfaces.filter((s) => s.type === "domain" && (s.status === "taken" || s.status === "parked"));
-  if (domains.length === 0) return null;
-  const dotCom = domains.find((d) => d.surface.endsWith(".com"));
-  const pick = dotCom ?? domains[0];
-  return { domain: pick.surface, status: pick.status };
-}
 
 const EXAMPLES = ["namescope", "quillbase", "fathomly", "orbitkit", "lumen"];
 
@@ -41,7 +30,7 @@ export function Check({
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
-  const [deferred, setDeferred] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const seq = useRef(0);
   const { openWatch } = useWatchlist();
 
@@ -96,11 +85,13 @@ export function Check({
   function removeEntry(id: number, name: string) {
     active.current.delete(name);
     setEntries((prev) => prev.filter((x) => x.id !== id));
+    setDetailId((d) => (d === id ? null : d));
   }
 
   function clearAll() {
     active.current.clear();
     setEntries([]);
+    setDetailId(null);
   }
 
   // Names routed in from the home Check door / a Generate candidate. addName
@@ -114,6 +105,17 @@ export function Check({
       onConsumeQueued();
     }
   }, [queuedName, onConsumeQueued]);
+
+  const detailEntry = detailId != null ? entries.find((e) => e.id === detailId) : undefined;
+  if (detailEntry) {
+    return (
+      <Detail
+        state={detailEntry.state}
+        onBack={() => setDetailId(null)}
+        onWatch={openWatch}
+      />
+    );
+  }
 
   return (
     <section>
@@ -275,9 +277,8 @@ export function Check({
             <NameCard
               key={e.id}
               entry={e}
-              deferredOpen={deferred === e.id}
               onRemove={() => removeEntry(e.id, e.name)}
-              onDeferred={() => setDeferred((d) => (d === e.id ? null : e.id))}
+              onOpenDetail={() => setDetailId(e.id)}
               onWatch={openWatch}
             />
           ))}
@@ -289,15 +290,13 @@ export function Check({
 
 function NameCard({
   entry,
-  deferredOpen,
   onRemove,
-  onDeferred,
+  onOpenDetail,
   onWatch,
 }: {
   entry: Entry;
-  deferredOpen: boolean;
   onRemove: () => void;
-  onDeferred: () => void;
+  onOpenDetail: () => void;
   onWatch: (domain: string, status: string) => void;
 }) {
   const { state } = entry;
@@ -341,10 +340,9 @@ function NameCard({
           <VerdictPill tone={v.tone} label={v.label} />
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {/* Deferred: full Detail view is Stage 3 */}
           <button
-            onClick={onDeferred}
-            title="Full report — arriving in Stage 3"
+            onClick={onOpenDetail}
+            title="Open the full name report"
             style={{
               fontSize: 12,
               fontWeight: 500,
@@ -447,12 +445,6 @@ function NameCard({
         {/* Trademark isn't in the stream yet — a real "coming soon" affordance. */}
         <SurfaceRow tag="™" label="Trademark class" status="soon" soon />
       </div>
-
-      {deferredOpen && (
-        <div style={{ padding: "0 18px 14px", fontSize: 12, color: T.faint, fontFamily: FONT_MONO }}>
-          Full name report arrives next.
-        </div>
-      )}
 
       {v.done && !v.allClear && anyTaken && watchTarget && (
         <div style={{ borderTop: `1px dashed ${T.line}`, padding: "13px 18px 16px", background: T.subtle }}>

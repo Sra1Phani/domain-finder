@@ -5,7 +5,7 @@
 // The client consumes CheckEvents (already mapped server-side by /api/check), so
 // "unknown"/"invalid" arrive as-is and are never re-derived toward available.
 
-import type { CheckEvent, CheckSurfaceEvent } from "./check-events";
+import type { CheckAcquire, CheckEvent, CheckSurfaceEvent } from "./check-events";
 import type { UiStatus } from "./ui/status";
 
 const REGISTRY_LABEL: Record<string, string> = { github: "GitHub", npm: "npm", pypi: "PyPI" };
@@ -19,6 +19,10 @@ export type SurfaceState = {
   url?: string | null;
   tld?: string | null;
   expiry?: string | null;
+  /** brand-operated/restricted TLD; null until known (domains only) */
+  restricted?: boolean | null;
+  /** acquirability forward slot; null until wired (premium/for-sale/price) */
+  acquire?: CheckAcquire | null;
 };
 
 export type CheckNameState = {
@@ -93,6 +97,8 @@ export function applyCheckEvent(state: CheckNameState, ev: CheckEvent): CheckNam
                 url: ev.url ?? null,
                 tld: ev.tld ?? null,
                 expiry: ev.expiry ?? null,
+                restricted: ev.restricted ?? null,
+                acquire: ev.acquire ?? null,
               }
             : s,
         ),

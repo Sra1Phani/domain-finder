@@ -16,3 +16,8 @@ export function buyUrl(domain: string): string {
 export function backorderUrl(domain: string): string {
   return `https://www.dropcatch.com/domain/${encodeURIComponent(domain)}`;
 }
+
+/** Public WHOIS lookup for a taken/parked domain — informational, not a sale. */
+export function whoisUrl(domain: string): string {
+  return `https://www.whois.com/whois/${encodeURIComponent(domain)}`;
+}
