@@ -10,9 +10,11 @@ import { getDb, type Db } from "./db";
 import { domains, watchEvents, watches } from "./db/schema";
 import { availabilityProvider } from "./core";
 import { nextCheckAt, type AvailabilityResult } from "@domain-finder/core";
+import { FREE_WATCH_LIMIT } from "./watch-limits";
 
-/** Free tier. One domain is a demo; three is a habit. */
-export const FREE_WATCH_LIMIT = 3;
+// Re-export so existing server-side importers keep `from "./watch"` working; the
+// value itself lives in the client-safe watch-limits module (single source).
+export { FREE_WATCH_LIMIT };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;

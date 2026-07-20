@@ -10,8 +10,22 @@ import {
 } from "@/lib/check-stream";
 import type { CheckEvent } from "@/lib/check-events";
 import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips } from "./parts";
+import { useWatchlist } from "./watchlist-context";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
+
+/** The domain a "Watch" affordance should monitor: the first taken/parked
+ * domain surface, preferring .com. Watches are domain-only, so a name whose
+ * domains are all free (only a registry is taken) has no watch target. */
+function watchTargetOf(
+  surfaces: { surface: string; type: "domain" | "registry"; status: string }[],
+): { domain: string; status: string } | null {
+  const domains = surfaces.filter((s) => s.type === "domain" && (s.status === "taken" || s.status === "parked"));
+  if (domains.length === 0) return null;
+  const dotCom = domains.find((d) => d.surface.endsWith(".com"));
+  const pick = dotCom ?? domains[0];
+  return { domain: pick.surface, status: pick.status };
+}
 
 const EXAMPLES = ["namescope", "quillbase", "fathomly", "orbitkit", "lumen"];
 
@@ -29,6 +43,7 @@ export function Check({
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
   const [deferred, setDeferred] = useState<number | null>(null);
   const seq = useRef(0);
+  const { openWatch } = useWatchlist();
 
   const toggleTld = (tld: string) =>
     setTlds((prev) =>
@@ -263,6 +278,7 @@ export function Check({
               deferredOpen={deferred === e.id}
               onRemove={() => removeEntry(e.id, e.name)}
               onDeferred={() => setDeferred((d) => (d === e.id ? null : e.id))}
+              onWatch={openWatch}
             />
           ))}
         </div>
@@ -276,17 +292,20 @@ function NameCard({
   deferredOpen,
   onRemove,
   onDeferred,
+  onWatch,
 }: {
   entry: Entry;
   deferredOpen: boolean;
   onRemove: () => void;
   onDeferred: () => void;
+  onWatch: (domain: string, status: string) => void;
 }) {
   const { state } = entry;
   const v = verdictOf(state);
   const domains = state.surfaces.filter((s) => s.type === "domain");
   const registries = state.surfaces.filter((s) => s.type === "registry");
   const anyTaken = state.surfaces.some((s) => s.status === "taken" || s.status === "parked");
+  const watchTarget = watchTargetOf(state.surfaces);
   const availBorder = statusStyle("available");
 
   return (
@@ -429,13 +448,21 @@ function NameCard({
         <SurfaceRow tag="™" label="Trademark class" status="soon" soon />
       </div>
 
-      {v.done && !v.allClear && anyTaken && (
+      {deferredOpen && (
+        <div style={{ padding: "0 18px 14px", fontSize: 12, color: T.faint, fontFamily: FONT_MONO }}>
+          Full name report arrives next.
+        </div>
+      )}
+
+      {v.done && !v.allClear && anyTaken && watchTarget && (
         <div style={{ borderTop: `1px dashed ${T.line}`, padding: "13px 18px 16px", background: T.subtle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: 12, color: T.muted }}>Taken here — watch it or try nearby:</span>
-            {/* Deferred: watchlist + nearby suggestions are Stage 3 */}
+            <span style={{ fontSize: 12, color: T.muted }}>
+              <span style={{ fontFamily: FONT_MONO }}>{watchTarget.domain}</span> is taken — watch it
+              and we&apos;ll email you if it frees up:
+            </span>
             <button
-              onClick={onDeferred}
+              onClick={() => onWatch(watchTarget.domain, watchTarget.status)}
               style={{
                 fontSize: 12,
                 fontWeight: 600,
@@ -451,17 +478,6 @@ function NameCard({
               ◔ Watch
             </button>
           </div>
-          {deferredOpen && (
-            <div style={{ marginTop: 9, fontSize: 12, color: T.faint, fontFamily: FONT_MONO }}>
-              Watchlist, nearby suggestions, and the full report arrive in Stage 3.
-            </div>
-          )}
-        </div>
-      )}
-
-      {deferredOpen && !(v.done && !v.allClear && anyTaken) && (
-        <div style={{ padding: "0 18px 16px", fontSize: 12, color: T.faint, fontFamily: FONT_MONO }}>
-          Full report arrives in Stage 3.
         </div>
       )}
     </div>

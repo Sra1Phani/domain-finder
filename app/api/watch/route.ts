@@ -50,6 +50,9 @@ export async function POST(req: Request) {
       domain: result.domain,
       status: result.status.status,
       bucket: result.status.bucket,
+      // The device-local watchlist stores this token to read status back later.
+      // It's the credential, and it only ever lives in the caller's own browser.
+      manageToken: result.manageToken,
       manageUrl: `/watch/${result.manageToken}`,
     },
     { status: 201 },
