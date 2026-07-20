@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { toCandidates } from "./generate-dto";
+import { toCandidates, filterBySource } from "./generate-dto";
 import type { AvailabilityResult, AvailabilityStatus, RankedSuggestion, SearchResponse } from "@domain-finder/core";
 
 const avail = (domain: string, status: AvailabilityStatus): AvailabilityResult => ({
@@ -91,4 +91,32 @@ test("dedups to one card per distinct name and respects the limit", () => {
 test("missing rationale becomes empty string, not undefined", () => {
   const [c] = toCandidates(resp([sug("x", ".com", "rule", "available", 50)]));
   assert.equal(c.rationale, "");
+});
+
+test("filterBySource: each filter returns exactly its source; 'all' returns everything", () => {
+  const all = toCandidates(
+    resp([
+      sug("alpha", ".com", "ai", "available", 90),
+      sug("beta", ".com", "rule", "taken", 70),
+      sug("gam", ".es", "hack", "available", 80),
+      sug("delta", ".io", "ai", "available", 60),
+    ]),
+  );
+  assert.deepEqual(filterBySource(all, "all"), all, "'all' is the unchanged list");
+  assert.deepEqual(filterBySource(all, "ai").map((c) => c.name), ["alpha", "delta"]);
+  assert.deepEqual(filterBySource(all, "rule").map((c) => c.name), ["beta"]);
+  assert.deepEqual(filterBySource(all, "hack").map((c) => c.name), ["gam.es"]);
+});
+
+test("filterBySource: a source with no candidates yields an empty subset (drives the empty state)", () => {
+  const noHacks = toCandidates(
+    resp([
+      sug("alpha", ".com", "ai", "available", 90),
+      sug("beta", ".com", "rule", "taken", 70),
+    ]),
+  );
+  assert.deepEqual(filterBySource(noHacks, "hack"), []);
+  // and on a genuinely empty list every filter (incl. "all") is empty
+  assert.deepEqual(filterBySource([], "all"), []);
+  assert.deepEqual(filterBySource([], "ai"), []);
 });

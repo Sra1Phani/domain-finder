@@ -2,13 +2,28 @@
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { toCandidates, type GenerateCandidate } from "@/lib/generate-dto";
+import { toCandidates, filterBySource, type GenerateCandidate, type SourceFilter } from "@/lib/generate-dto";
 import type { SearchResponse } from "@domain-finder/core";
 import { SourceTag, StatusDot, TldChips } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
 const VIBES = ["Any", "Playful", "Serious", "Techy"];
+
+const SOURCE_FILTERS: { key: SourceFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "ai", label: "AI" },
+  { key: "rule", label: "Rule" },
+  { key: "hack", label: "Hacks" },
+];
+
+// Shown when the active single-source filter has zero candidates — a clear
+// message beats a blank panel that reads as broken.
+const EMPTY_LABEL: Record<Exclude<SourceFilter, "all">, string> = {
+  ai: "No AI names for this one",
+  rule: "No rule-based names for this one",
+  hack: "No domain-hacks for this one",
+};
 
 function sourceTone(source: GenerateCandidate["source"]) {
   if (source === "rule-based") {
@@ -36,6 +51,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const [error, setError] = useState<string | null>(null);
   const [ran, setRan] = useState(false);
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
 
   const toggleTld = (tld: string) =>
     setTlds((prev) =>
@@ -77,7 +93,11 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
     return next;
   };
 
-  const visible = candidates.filter((c) => !dismissed.has(c.name));
+  // Two pure view filters over the already-loaded list — dismissals, then the
+  // source segmented control. No refetch: switching filters never hits /api.
+  const kept = candidates.filter((c) => !dismissed.has(c.name));
+  const visible = filterBySource(kept, sourceFilter);
+  const hacksOnly = sourceFilter === "hack";
   const chipOff: CSSProperties = {
     fontFamily: "inherit",
     fontSize: 12.5,
@@ -122,7 +142,24 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
           }}
         />
         <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12, marginTop: 4 }}>
-          <TldChips selected={tlds} onToggle={toggleTld} />
+          {/* Domain-hacks read across the dot (recip.es) and so ignore the TLD
+              selection entirely. When "Hacks" is the active filter, dim the chips
+              AND say so — dimming alone doesn't explain why they're inert. */}
+          <div
+            aria-disabled={hacksOnly}
+            style={{
+              opacity: hacksOnly ? 0.4 : 1,
+              pointerEvents: hacksOnly ? "none" : "auto",
+              transition: "opacity .15s ease",
+            }}
+          >
+            <TldChips selected={tlds} onToggle={toggleTld} />
+          </div>
+          {hacksOnly && (
+            <div style={{ fontSize: 11.5, color: T.faint, fontFamily: FONT_MONO, marginTop: 8 }}>
+              Domain-hacks ignore TLD selection — they read across the dot.
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingTop: 12, marginTop: 4 }}>
           {/* Steering (vibe / short) isn't a /api/search parameter yet — rendered
@@ -181,8 +218,41 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
         </div>
       )}
 
+      {candidates.length > 0 && !loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: T.faint, fontFamily: FONT_MONO, textTransform: "uppercase", letterSpacing: ".05em" }}>Source</span>
+          <div style={{ display: "inline-flex", gap: 3, background: T.subtle, border: `1px solid ${T.line}`, borderRadius: 999, padding: 3 }}>
+            {SOURCE_FILTERS.map(({ key, label }) => {
+              const on = sourceFilter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSourceFilter(key)}
+                  aria-pressed={on}
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 12.5,
+                    fontWeight: on ? 600 : 500,
+                    padding: "5px 14px",
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    border: "none",
+                    background: on ? T.card : "transparent",
+                    color: on ? T.brand : T.muted,
+                    boxShadow: on ? "0 1px 3px rgba(20,18,40,.09)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {visible.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(226px,1fr))", gap: 14, marginTop: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(226px,1fr))", gap: 14, marginTop: 14 }}>
           {visible.map((c, i) => {
             const tone = sourceTone(c.source);
             const starred = shortlist.has(c.name);
@@ -266,6 +336,22 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
               </div>
             );
           })}
+        </div>
+      )}
+
+      {candidates.length > 0 && !loading && visible.length === 0 && sourceFilter !== "all" && (
+        <div
+          style={{
+            marginTop: 14,
+            textAlign: "center",
+            fontSize: 14,
+            color: T.muted,
+            border: `1.5px dashed ${T.line}`,
+            borderRadius: radius,
+            padding: "30px 16px",
+          }}
+        >
+          {EMPTY_LABEL[sourceFilter]} — try another source.
         </div>
       )}
 

@@ -44,6 +44,27 @@ function domainStatus(s: string): CheckStatus {
   }
 }
 
+// The Generate page's client-side source filter. Purely a view over the
+// already-loaded candidate list — it never triggers a refetch. Kept here (not
+// in the component) so it's unit-testable in isolation.
+export type SourceFilter = "all" | "ai" | "rule" | "hack";
+
+const FILTER_SOURCE: Record<Exclude<SourceFilter, "all">, GenerateSource> = {
+  ai: "AI",
+  rule: "rule-based",
+  hack: "domain-hack",
+};
+
+/** candidates + active filter -> visible subset. "all" returns the list
+ * unchanged; any single-source filter returns only that source (possibly []). */
+export function filterBySource(
+  candidates: GenerateCandidate[],
+  filter: SourceFilter,
+): GenerateCandidate[] {
+  if (filter === "all") return candidates;
+  return candidates.filter((c) => c.source === FILTER_SOURCE[filter]);
+}
+
 export function toCandidates(res: SearchResponse, limit = 12): GenerateCandidate[] {
   const seen = new Set<string>();
   const out: GenerateCandidate[] = [];
