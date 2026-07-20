@@ -32,7 +32,7 @@ export const radiusS = `${RADIUS_S}px`;
 // Swappable wordmark — neutral placeholder, one point of change. Do NOT bake a
 // real brand in here; the design's "Clearance" was mock and is intentionally
 // not used.
-export const WORDMARK = "namecheck";
+export const WORDMARK = "synthname";
 
 // TLD options offered in the Check/Generate selectors (with leading dot). Both
 // backends accept the `tlds` param — /api/search wants the dot, streamBrand
