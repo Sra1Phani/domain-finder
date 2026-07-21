@@ -65,6 +65,18 @@ export function filterBySource(
   return candidates.filter((c) => c.source === FILTER_SOURCE[filter]);
 }
 
+/**
+ * Auto-variations for a taken name: the AVAILABLE candidates from a search
+ * seeded with that name, in the response's (value-ranked, available-first)
+ * order. Only real "available" domains — never unknown/taken, never fabricated.
+ * Returns [] when nothing is free (the caller says so honestly).
+ */
+export function pickVariations(res: SearchResponse, limit = 6): GenerateCandidate[] {
+  return toCandidates(res, 60)
+    .filter((c) => c.status === "available")
+    .slice(0, limit);
+}
+
 export function toCandidates(res: SearchResponse, limit = 12): GenerateCandidate[] {
   const seen = new Set<string>();
   const out: GenerateCandidate[] = [];

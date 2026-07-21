@@ -9,7 +9,9 @@ import {
   type CheckNameState,
 } from "@/lib/check-stream";
 import type { CheckEvent } from "@/lib/check-events";
-import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips } from "./parts";
+import { pickVariations, type GenerateCandidate } from "@/lib/generate-dto";
+import type { SearchResponse } from "@domain-finder/core";
+import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips, StatusDot } from "./parts";
 import { Detail } from "./Detail";
 import { useWatchlist } from "./watchlist-context";
 import { watchTargetOf } from "@/lib/detail";
@@ -281,6 +283,7 @@ export function Check({
               onRemove={() => removeEntry(e.id, e.name)}
               onOpenDetail={() => setDetailId(e.id)}
               onWatch={openWatch}
+              onCheckName={addName}
             />
           ))}
         </div>
@@ -294,11 +297,13 @@ function NameCard({
   onRemove,
   onOpenDetail,
   onWatch,
+  onCheckName,
 }: {
   entry: Entry;
   onRemove: () => void;
   onOpenDetail: () => void;
   onWatch: (domain: string, status: string) => void;
+  onCheckName: (name: string) => void;
 }) {
   const { state } = entry;
   const v = verdictOf(state);
@@ -311,6 +316,8 @@ function NameCard({
   const registries = state.surfaces.filter((s) => s.type === "registry");
   const anyTaken = state.surfaces.some((s) => s.status === "taken" || s.status === "parked");
   const watchTarget = watchTargetOf(state.surfaces);
+  // A "dead end": resolved, and not one checked domain is free to register.
+  const deadEnd = v.done && domains.length > 0 && !domains.some((d) => d.status === "available");
   const availBorder = statusStyle("available");
 
   return (
@@ -476,6 +483,96 @@ function NameCard({
               ◔ Watch
             </button>
           </div>
+        </div>
+      )}
+
+      {/* No dead ends: when nothing is free, pre-checked variations seeded from
+          this name (via the existing generation engine), available-first. */}
+      {deadEnd && <Variations name={state.name} onCheck={onCheckName} />}
+    </div>
+  );
+}
+
+// Pre-checked "names close to X that are free" — reuses /api/search seeded with
+// the name (no new generation logic) and shows only its AVAILABLE results.
+// Self-fetches once on mount; also used by the available-only empty state.
+export function Variations({
+  name,
+  onCheck,
+  compact = false,
+}: {
+  name: string;
+  onCheck: (name: string) => void;
+  compact?: boolean;
+}) {
+  const [vs, setVs] = useState<{ loading: boolean; error: boolean; items: GenerateCandidate[] }>({
+    loading: true,
+    error: false,
+    items: [],
+  });
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+    fetch("/api/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: name, useAi: true, useHacks: true }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return (await r.json()) as SearchResponse;
+      })
+      .then((d) => setVs({ loading: false, error: false, items: pickVariations(d, 6) }))
+      .catch(() => setVs({ loading: false, error: true, items: [] }));
+  }, [name]);
+
+  const availStyle = statusStyle("available");
+  return (
+    <div
+      style={{
+        borderTop: `1px dashed ${T.line}`,
+        padding: compact ? "12px 0 2px" : "13px 18px 16px",
+        background: compact ? "transparent" : T.subtle,
+      }}
+    >
+      <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", color: T.faint, marginBottom: 9 }}>
+        Names close to {name} that are free
+      </div>
+      {vs.loading ? (
+        <span style={{ fontSize: 12.5, color: T.muted, fontFamily: FONT_MONO }}>finding names that are free…</span>
+      ) : vs.error ? (
+        <span style={{ fontSize: 12.5, color: T.muted }}>Couldn&apos;t fetch alternatives — try again.</span>
+      ) : vs.items.length === 0 ? (
+        <span style={{ fontSize: 12.5, color: T.muted }}>
+          No free variations found — try a different root word.
+        </span>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {vs.items.map((c) => (
+            <button
+              key={c.name}
+              onClick={() => onCheck(c.checkName)}
+              title={`Check ${c.checkName}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontFamily: FONT_MONO,
+                fontSize: 12.5,
+                color: availStyle.text,
+                background: availStyle.bg,
+                border: `1px solid ${availStyle.border}`,
+                borderRadius: 999,
+                padding: "5px 11px",
+                cursor: "pointer",
+              }}
+            >
+              <StatusDot status="available" size={13} />
+              {c.name}
+            </button>
+          ))}
         </div>
       )}
     </div>

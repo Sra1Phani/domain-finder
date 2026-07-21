@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { toCandidates, filterBySource } from "./generate-dto";
+import { toCandidates, filterBySource, pickVariations } from "./generate-dto";
 import type { AvailabilityResult, AvailabilityStatus, RankedSuggestion, SearchResponse } from "@domain-finder/core";
 
 const avail = (domain: string, status: AvailabilityStatus): AvailabilityResult => ({
@@ -106,6 +106,27 @@ test("filterBySource: each filter returns exactly its source; 'all' returns ever
   assert.deepEqual(filterBySource(all, "ai").map((c) => c.name), ["alpha", "delta"]);
   assert.deepEqual(filterBySource(all, "rule").map((c) => c.name), ["beta"]);
   assert.deepEqual(filterBySource(all, "hack").map((c) => c.name), ["gam.es"]);
+});
+
+test("pickVariations returns only AVAILABLE candidates, in ranked order, capped", () => {
+  const res = resp([
+    sug("getalpha", ".com", "rule", "available", 92),
+    sug("alpha", ".com", "ai", "taken", 80), // the taken original — excluded
+    sug("alphahq", ".io", "rule", "available", 88),
+    sug("alph", ".ly", "hack", "unknown", 70), // unknown — never shown as free
+    sug("tryalpha", ".dev", "rule", "available", 84),
+  ]);
+  const vars = pickVariations(res, 2);
+  assert.deepEqual(vars.map((c) => c.checkName), ["getalpha", "alphahq"], "available-first, capped at 2");
+  assert.ok(vars.every((c) => c.status === "available"), "only free names surface");
+});
+
+test("pickVariations is empty when nothing is free (honest dead-end)", () => {
+  const res = resp([
+    sug("alpha", ".com", "ai", "taken", 80),
+    sug("alpha", ".io", "ai", "unknown", 60),
+  ]);
+  assert.deepEqual(pickVariations(res), []);
 });
 
 test("filterBySource: a source with no candidates yields an empty subset (drives the empty state)", () => {
