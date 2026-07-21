@@ -36,6 +36,11 @@ export const WORDMARK = "synthname";
 
 // TLD options offered in the Check/Generate selectors (with leading dot). Both
 // backends accept the `tlds` param — /api/search wants the dot, streamBrand
-// strips it — so passing the dotted form works for both.
-export const TLD_OPTIONS = [".com", ".io", ".ai", ".co", ".app", ".dev", ".xyz", ".me"];
+// strips it — so passing the dotted form works for both. A TLD with no public
+// RDAP server just resolves to "unknown" (rendered honestly, never green), so
+// offering a broad palette is safe.
+export const TLD_OPTIONS = [
+  ".com", ".io", ".ai", ".co", ".app", ".dev", ".net", ".org",
+  ".xyz", ".me", ".tech", ".cloud", ".online", ".site", ".store", ".space",
+];
 export const DEFAULT_TLDS_UI = [".com", ".io", ".dev", ".app", ".ai"];
