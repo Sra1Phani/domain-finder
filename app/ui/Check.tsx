@@ -35,9 +35,9 @@ export function Check({
   const { openWatch } = useWatchlist();
 
   const toggleTld = (tld: string) =>
-    setTlds((prev) =>
-      prev.includes(tld) ? (prev.length > 1 ? prev.filter((t) => t !== tld) : prev) : [...prev, tld],
-    );
+    setTlds((prev) => (prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld]));
+  const addTld = (tld: string) => setTlds((prev) => (prev.includes(tld) ? prev : [...prev, tld]));
+  const clearTlds = () => setTlds([]);
   // Synchronous dedupe guard — survives StrictMode's double-invoked effects
   // (a closure check on `entries` would see stale [] twice and duplicate).
   const active = useRef<Set<string>>(new Set());
@@ -241,7 +241,7 @@ export function Check({
       </div>
 
       <div style={{ marginTop: 14, maxWidth: 640 }}>
-        <TldChips selected={tlds} onToggle={toggleTld} />
+        <TldChips selected={tlds} onToggle={toggleTld} onAdd={addTld} onClear={clearTlds} />
       </div>
 
       {entries.length === 0 ? (

@@ -61,9 +61,9 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const [short, setShort] = useState(false);
 
   const toggleTld = (tld: string) =>
-    setTlds((prev) =>
-      prev.includes(tld) ? (prev.length > 1 ? prev.filter((t) => t !== tld) : prev) : [...prev, tld],
-    );
+    setTlds((prev) => (prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld]));
+  const addTld = (tld: string) => setTlds((prev) => (prev.includes(tld) ? prev : [...prev, tld]));
+  const clearTlds = () => setTlds([]);
 
   async function runGenerate() {
     const query = description.trim();
@@ -159,7 +159,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
               transition: "opacity .15s ease",
             }}
           >
-            <TldChips selected={tlds} onToggle={toggleTld} />
+            <TldChips selected={tlds} onToggle={toggleTld} onAdd={addTld} onClear={clearTlds} />
           </div>
           {hacksOnly && (
             <div style={{ fontSize: 11.5, color: T.faint, fontFamily: FONT_MONO, marginTop: 8 }}>

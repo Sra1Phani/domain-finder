@@ -1,21 +1,39 @@
-// Shared presentational parts + style helpers, ported from the design's style
-// functions. Pure/presentational — no hooks — so they ride the client boundary
-// of whichever flow imports them. All status styling flows through the tested
-// lib/ui/status module (the false-available guard).
+"use client";
 
-import type { CSSProperties, ReactNode } from "react";
+// Shared presentational parts + style helpers, ported from the design's style
+// functions. All status styling flows through the tested lib/ui/status module
+// (the false-available guard).
+
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { statusStyle, isDashed } from "@/lib/ui/status";
+import { normalizeTld } from "@/lib/tld-input";
 import { T, FONT_DISPLAY, FONT_MONO, radiusS, TLD_OPTIONS } from "@/lib/ui/tokens";
 
-/** Multi-select TLD chips. Keeps at least one selected (empty would silently
- * fall back to the backend default, which is confusing). */
+/** Multi-select TLD chips + a free-text "+ add" for any TLD not in the preset
+ * list, and a Clear control. Empty selection is allowed — the caller's backend
+ * falls back to its default set, and the empty-state hint says so (so it isn't
+ * a silent fallback). Custom-added TLDs render as extra chips. */
 export function TldChips({
   selected,
   onToggle,
+  onAdd,
+  onClear,
 }: {
   selected: string[];
   onToggle: (tld: string) => void;
+  onAdd: (tld: string) => void;
+  onClear: () => void;
 }) {
+  const [draft, setDraft] = useState("");
+  // preset options plus any custom TLD the user added that isn't a preset
+  const chips = [...TLD_OPTIONS, ...selected.filter((t) => !TLD_OPTIONS.includes(t))];
+
+  const submitDraft = () => {
+    const tld = normalizeTld(draft);
+    if (tld) onAdd(tld);
+    setDraft("");
+  };
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
       <span
@@ -29,7 +47,7 @@ export function TldChips({
       >
         TLDs
       </span>
-      {TLD_OPTIONS.map((tld) => {
+      {chips.map((tld) => {
         const on = selected.includes(tld);
         return (
           <button
@@ -53,6 +71,54 @@ export function TldChips({
           </button>
         );
       })}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submitDraft();
+          }
+        }}
+        onBlur={submitDraft}
+        placeholder="+ add .tld"
+        aria-label="Add a custom TLD"
+        spellCheck={false}
+        autoComplete="off"
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: 12.5,
+          width: 84,
+          padding: "5px 11px",
+          borderRadius: 999,
+          border: `1px dashed ${T.line}`,
+          background: T.card,
+          color: T.ink,
+          outline: "none",
+        }}
+      />
+      {selected.length > 0 ? (
+        <button
+          type="button"
+          onClick={onClear}
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 12,
+            color: T.faint,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          Clear
+        </button>
+      ) : (
+        <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.faint }}>
+          none selected — the default set is used
+        </span>
+      )}
     </div>
   );
 }
