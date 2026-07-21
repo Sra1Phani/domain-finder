@@ -12,10 +12,13 @@
 
 import { z } from "zod";
 import { DEFAULT_TLDS } from "./tlds";
-import type { Suggestion, SuggestionSource } from "./types";
+import type { Suggestion, SuggestionSource, Vibe } from "./types";
 import type { FetchLike } from "./availability";
 import type { CacheStore } from "./cache";
 import { domainHacks } from "./hacks";
+
+/** Labels longer than this are dropped when the caller asks for "short only". */
+export const SHORT_MAX_LEN = 12;
 
 const DEFAULT_AI_MODEL = "anthropic/claude-haiku-4-5";
 
@@ -75,14 +78,23 @@ function keywords(query: string): string[] {
 // --- rule-based path ---------------------------------------------------------
 
 const PREFIXES = ["get", "try", "go", "use", "join", "my"];
-const SUFFIXES = [
-  "ly", "hq", "app", "hub", "ify", "labs", "kit", "flow", "base", "now", "wise", "spot",
-];
 
-export function ruleBasedLabels(query: string): string[] {
+// Affix pools per vibe — the rule-based counterpart to the AI tone steering.
+// "any" is the broad default; the others lean the generated labels toward a
+// feel (playful/serious/techy). Prefixes stay constant; the suffix set is what
+// carries most of the flavor.
+const SUFFIXES_BY_VIBE: Record<Vibe, string[]> = {
+  any: ["ly", "hq", "app", "hub", "ify", "labs", "kit", "flow", "base", "now", "wise", "spot"],
+  playful: ["ly", "oo", "zy", "pop", "kit", "bud", "boo", "doo", "go", "yay"],
+  serious: ["hq", "labs", "works", "group", "core", "base", "systems", "point", "co", "one"],
+  techy: ["ify", "flow", "stack", "byte", "sync", "node", "io", "dev", "grid", "ops"],
+};
+
+export function ruleBasedLabels(query: string, vibe: Vibe = "any"): string[] {
   const words = keywords(query);
   if (words.length === 0) return [];
 
+  const suffixes = SUFFIXES_BY_VIBE[vibe] ?? SUFFIXES_BY_VIBE.any;
   const out = new Set<string>();
   const push = (s: string) => {
     const n = normalizeLabel(s);
@@ -95,11 +107,11 @@ export function ruleBasedLabels(query: string): string[] {
 
   for (const w of words) {
     push(w);
-    for (const s of SUFFIXES) push(w + s);
+    for (const s of suffixes) push(w + s);
     for (const p of PREFIXES) push(p + w);
   }
   if (words.length >= 2) {
-    for (const s of SUFFIXES) push(joined + s);
+    for (const s of suffixes) push(joined + s);
     for (const p of PREFIXES) push(p + joined);
   }
 
@@ -111,10 +123,19 @@ export function ruleBasedLabels(query: string): string[] {
 
 type AiLabel = { label: string; rationale: string };
 
+// Tone instruction appended to the AI prompt per vibe. "any" adds nothing.
+const VIBE_TONE: Record<Vibe, string> = {
+  any: "",
+  playful: " Tone: playful and friendly — fun, approachable, a little whimsical.",
+  serious: " Tone: serious and professional — credible, trustworthy, enterprise-ready.",
+  techy: " Tone: technical and modern — developer-oriented, with a systems/infra feel.",
+};
+
 async function aiLabels(
   query: string,
   count: number,
   deps: Pick<GenerateDeps, "config" | "generateObject">,
+  vibe: Vibe = "any",
 ): Promise<AiLabel[]> {
   const { config, generateObject } = deps;
   // Exact degrade-to-rule-based behavior: no credentials (or no injected
@@ -149,7 +170,8 @@ async function aiLabels(
         `letters and digits only, avoid hyphens unless they clearly help. ` +
         `Mix literal descriptors with inventive/coined names. For each name, the ` +
         `rationale must connect it specifically to this idea (reference a keyword ` +
-        `or the meaning above) — avoid generic praise like "brandable and catchy".`,
+        `or the meaning above) — avoid generic praise like "brandable and catchy".` +
+        (VIBE_TONE[vibe] ?? ""),
     });
     return object.names.map((n) => ({ label: n.name, rationale: n.rationale }));
   } catch {
@@ -168,6 +190,10 @@ export type GenerateOptions = {
    * filter — a hack's zone is dictated by the word itself, which is the point.
    */
   useHacks?: boolean;
+  /** steer name style (AI tone + rule-based affixes); defaults to "any" */
+  vibe?: Vibe;
+  /** keep only short labels (<= SHORT_MAX_LEN chars) */
+  short?: boolean;
   /** hard cap on concrete domain candidates returned */
   maxCandidates?: number;
   /** cap on distinct labels before TLD expansion */
@@ -190,9 +216,10 @@ export async function generateSuggestions(
   const tlds = opts.tlds?.length ? opts.tlds : DEFAULT_TLDS;
   const maxCandidates = opts.maxCandidates ?? 45;
   const maxLabels = opts.maxLabels ?? 24;
+  const vibe: Vibe = opts.vibe ?? "any";
 
   const aiResults =
-    opts.useAi === false ? [] : await aiLabels(query, 12, deps);
+    opts.useAi === false ? [] : await aiLabels(query, 12, deps, vibe);
   const aiUsed = aiResults.length > 0;
 
   // AI labels lead (they carry rationale and are usually more brandable),
@@ -212,11 +239,16 @@ export async function generateSuggestions(
   const ruleRationale = kws.length
     ? `Built from "${kws[0]}" in your idea — familiar and quick to say.`
     : undefined;
-  for (const l of ruleBasedLabels(query)) {
+  for (const l of ruleBasedLabels(query, vibe)) {
     if (!labels.has(l)) labels.set(l, { source: "rule", rationale: ruleRationale });
   }
 
-  const ordered = [...labels.entries()].slice(0, maxLabels);
+  // "short only" — drop longer labels before TLD expansion. Applied to labels,
+  // not hacks (a hack's length is dictated by the word and it's short already).
+  const kept = opts.short
+    ? [...labels.entries()].filter(([sld]) => sld.length <= SHORT_MAX_LEN)
+    : [...labels.entries()];
+  const ordered = kept.slice(0, maxLabels);
 
   // Domain hacks, drawn from the query's own words plus any AI-coined labels
   // ("meally" -> meal.ly). They lead the list: they're the most distinctive

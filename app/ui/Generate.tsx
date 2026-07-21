@@ -3,12 +3,17 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { toCandidates, filterBySource, type GenerateCandidate, type SourceFilter } from "@/lib/generate-dto";
-import type { SearchResponse } from "@domain-finder/core";
+import type { SearchResponse, Vibe } from "@domain-finder/core";
 import { SourceTag, StatusDot, TldChips } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
-const VIBES = ["Any", "Playful", "Serious", "Techy"];
+const VIBES: { value: Vibe; label: string }[] = [
+  { value: "any", label: "Any" },
+  { value: "playful", label: "Playful" },
+  { value: "serious", label: "Serious" },
+  { value: "techy", label: "Techy" },
+];
 
 const SOURCE_FILTERS: { key: SourceFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -52,6 +57,8 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const [ran, setRan] = useState(false);
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS_UI);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [vibe, setVibe] = useState<Vibe>("any");
+  const [short, setShort] = useState(false);
 
   const toggleTld = (tld: string) =>
     setTlds((prev) =>
@@ -68,7 +75,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query, useAi: true, useHacks: true, tlds }),
+        body: JSON.stringify({ query, useAi: true, useHacks: true, tlds, vibe, short }),
       });
       if (!res.ok) {
         setError(`Generation failed (${res.status}).`);
@@ -98,18 +105,17 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const kept = candidates.filter((c) => !dismissed.has(c.name));
   const visible = filterBySource(kept, sourceFilter);
   const hacksOnly = sourceFilter === "hack";
-  const chipOff: CSSProperties = {
+  const steerChip = (on: boolean): CSSProperties => ({
     fontFamily: "inherit",
     fontSize: 12.5,
-    fontWeight: 500,
+    fontWeight: on ? 600 : 500,
     padding: "5px 12px",
     borderRadius: 999,
-    border: `1px solid ${T.line}`,
-    background: T.card,
-    color: T.faint,
-    cursor: "not-allowed",
-    opacity: 0.7,
-  };
+    border: `1px solid ${on ? T.brand : T.line}`,
+    background: on ? T.brand : T.card,
+    color: on ? "#fff" : T.muted,
+    cursor: "pointer",
+  });
 
   return (
     <section style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -162,17 +168,29 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingTop: 12, marginTop: 4 }}>
-          {/* Steering (vibe / short) isn't a /api/search parameter yet — rendered
-              inactive rather than faking an effect. */}
-          <span style={{ fontSize: 11, color: T.faint, fontFamily: FONT_MONO, textTransform: "uppercase", letterSpacing: ".05em" }} title="Steering arrives in a later stage">
+          {/* Steering — tunes the AI tone and the rule-based affix pool; "short
+              only" drops longer labels before TLD expansion. Applied on the
+              next Generate run. */}
+          <span style={{ fontSize: 11, color: T.faint, fontFamily: FONT_MONO, textTransform: "uppercase", letterSpacing: ".05em" }}>
             Vibe
           </span>
           {VIBES.map((v) => (
-            <button key={v} disabled style={chipOff} title="Steering — coming soon">
-              {v}
+            <button
+              key={v.value}
+              type="button"
+              onClick={() => setVibe(v.value)}
+              aria-pressed={vibe === v.value}
+              style={steerChip(vibe === v.value)}
+            >
+              {v.label}
             </button>
           ))}
-          <button disabled style={chipOff} title="Steering — coming soon">
+          <button
+            type="button"
+            onClick={() => setShort((s) => !s)}
+            aria-pressed={short}
+            style={steerChip(short)}
+          >
             short only
           </button>
           <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: T.faint, marginLeft: "auto" }}>{description.length} / 200</span>

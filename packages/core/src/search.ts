@@ -39,6 +39,8 @@ export async function runSearch(
     tlds: req.tlds,
     useAi: req.useAi,
     useHacks: req.useHacks,
+    vibe: req.vibe,
+    short: req.short,
   });
 
   const availability = await ctx.checkMany(suggestions.map((s) => s.domain));

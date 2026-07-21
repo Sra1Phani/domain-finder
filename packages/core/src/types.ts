@@ -72,6 +72,12 @@ export type RankedSuggestion = Suggestion & {
   scoreReasons: string[];
 };
 
+/** Steering the "feel" of generated names — tunes the AI tone and the
+ * rule-based affix pool. "any" is the neutral default. */
+export type Vibe = "any" | "playful" | "serious" | "techy";
+
+export const VIBES: Vibe[] = ["any", "playful", "serious", "techy"];
+
 export type SearchRequest = {
   /** free-text keyword or product description */
   query: string;
@@ -81,6 +87,10 @@ export type SearchRequest = {
   useAi?: boolean;
   /** whether to include domain hacks like bit.ly (defaults true) */
   useHacks?: boolean;
+  /** steer the name style (AI tone + rule-based affixes); defaults to "any" */
+  vibe?: Vibe;
+  /** keep only short, punchy labels (<= SHORT_MAX_LEN chars) */
+  short?: boolean;
 };
 
 export type SearchResponse = {

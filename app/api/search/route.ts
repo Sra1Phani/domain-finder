@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { search } from "@/lib/core";
-import type { SearchRequest } from "@domain-finder/core";
+import { VIBES, type SearchRequest, type Vibe } from "@domain-finder/core";
 import { RateLimiter, clientKey } from "@/lib/rate-limit";
 
 // RDAP calls + optional AI use Node APIs and can take a few seconds.
@@ -50,11 +50,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Only accept a known vibe; anything else falls back to the neutral default.
+  const vibe: Vibe | undefined =
+    typeof body.vibe === "string" && (VIBES as string[]).includes(body.vibe)
+      ? (body.vibe as Vibe)
+      : undefined;
+
   const result = await search({
     query: body.query,
     tlds: Array.isArray(body.tlds) ? body.tlds : undefined,
     useAi: body.useAi,
     useHacks: body.useHacks,
+    vibe,
+    short: body.short === true,
   });
 
   return NextResponse.json(result);
