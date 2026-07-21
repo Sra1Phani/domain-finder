@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { normalizeTld } from "./tld-input";
+import { normalizeRegistrableTld, normalizeTld, registrableTlds } from "./tld-input";
 
 test("normalizeTld adds the leading dot and lowercases", () => {
   assert.equal(normalizeTld("io"), ".io");
@@ -23,4 +23,14 @@ test("normalizeTld rejects junk (too short, numeric, empty)", () => {
   assert.equal(normalizeTld(""), null);
   assert.equal(normalizeTld("."), null);
   assert.equal(normalizeTld("!!"), null);
+});
+
+test("registrableTlds drops brand-operated/restricted TLDs from the picker", () => {
+  assert.deepEqual(registrableTlds([".com", ".map", ".io", ".gov", ".dev"]), [".com", ".io", ".dev"]);
+});
+
+test("normalizeRegistrableTld rejects a restricted TLD but accepts a normal one", () => {
+  assert.equal(normalizeRegistrableTld("map"), null); // brand-operated
+  assert.equal(normalizeRegistrableTld(".gov"), null);
+  assert.equal(normalizeRegistrableTld("io"), ".io");
 });

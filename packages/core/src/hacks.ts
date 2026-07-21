@@ -9,6 +9,7 @@
 import type { Suggestion } from "./types";
 import type { CacheStore } from "./cache";
 import type { FetchLike } from "./availability";
+import { isRestrictedTld } from "./tlds";
 
 const IANA_TLDS = "https://data.iana.org/TLD/tlds-alpha-by-domain.txt";
 const ZONES_KEY = "iana:zones";
@@ -65,7 +66,10 @@ export async function domainHacks(
   const zones = await getZones(deps);
   if (zones.length === 0) return [];
 
-  const byLength = zones.filter((z) => z.length <= MAX_ZONE);
+  // Only split on short, openly-registrable zones. The list is already
+  // IANA-delegated (loadZones), but some delegated zones are brand-operated
+  // (.map, .aws, …) — a "career.map" hack you can never register is noise.
+  const byLength = zones.filter((z) => z.length <= MAX_ZONE && !isRestrictedTld(z));
   const out: Suggestion[] = [];
   const seen = new Set<string>();
 

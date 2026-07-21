@@ -6,7 +6,7 @@
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { statusStyle, isDashed } from "@/lib/ui/status";
-import { normalizeTld } from "@/lib/tld-input";
+import { normalizeRegistrableTld, registrableTlds } from "@/lib/tld-input";
 import { T, FONT_DISPLAY, FONT_MONO, radiusS, TLD_OPTIONS } from "@/lib/ui/tokens";
 
 /** Multi-select TLD chips + a free-text "+ add" for any TLD not in the preset
@@ -25,11 +25,12 @@ export function TldChips({
   onClear: () => void;
 }) {
   const [draft, setDraft] = useState("");
-  // preset options plus any custom TLD the user added that isn't a preset
-  const chips = [...TLD_OPTIONS, ...selected.filter((t) => !TLD_OPTIONS.includes(t))];
+  // Preset options plus any custom TLD the user added — with restricted/
+  // brand-operated TLDs excluded, so the picker only offers registrable ones.
+  const chips = registrableTlds([...TLD_OPTIONS, ...selected.filter((t) => !TLD_OPTIONS.includes(t))]);
 
   const submitDraft = () => {
-    const tld = normalizeTld(draft);
+    const tld = normalizeRegistrableTld(draft);
     if (tld) onAdd(tld);
     setDraft("");
   };
