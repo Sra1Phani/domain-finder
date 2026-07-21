@@ -62,6 +62,20 @@ function cleanPoints(sld: string): [number, string[]] {
   return [pts, reasons];
 }
 
+// Structural "value" of a domain, independent of availability: shorter beats
+// longer, a higher TLD tier (.com > .io/.ai > … > the long tail) beats a lower
+// one, and hyphens/digits hurt. Normalised to 0–100. This is the tiebreaker
+// used WITHIN an availability bucket — availability itself dominates via the
+// bucket sort, so an available name always ranks above a taken one regardless
+// of value.
+export function valueScore(suggestion: Pick<Suggestion, "sld" | "tld">): number {
+  const [lenPts] = lengthPoints(suggestion.sld); // 0..W_LENGTH
+  const tldPts = tldWeight(suggestion.tld) * W_TLD; // 0..W_TLD
+  const [cleanPts] = cleanPoints(suggestion.sld); // 0..W_CLEAN
+  const max = W_LENGTH + W_TLD + W_CLEAN;
+  return Math.round(((lenPts + tldPts + cleanPts) / max) * 100);
+}
+
 export function scoreSuggestion(
   suggestion: Suggestion,
   availability: AvailabilityResult,
@@ -124,12 +138,17 @@ export function rankSuggestions(
     unavailable: 0,
   };
 
-  ranked.sort((a, b) => {
+  // Bucket dominates (availability first); within a bucket, structural VALUE is
+  // the tiebreaker (short/clean/high-tier first), with the buy-score as the
+  // final tiebreaker so e.g. "deleting" edges "expiring" when value ties.
+  const withValue = ranked.map((r) => ({ r, value: valueScore(r) }));
+  withValue.sort((a, b) => {
     const byBucket =
-      BUCKET_ORDER[b.availability.bucket] - BUCKET_ORDER[a.availability.bucket];
+      BUCKET_ORDER[b.r.availability.bucket] - BUCKET_ORDER[a.r.availability.bucket];
     if (byBucket !== 0) return byBucket;
-    return b.score - a.score;
+    if (b.value !== a.value) return b.value - a.value;
+    return b.r.score - a.r.score;
   });
 
-  return ranked;
+  return withValue.map((x) => x.r);
 }

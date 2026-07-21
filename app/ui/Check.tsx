@@ -13,6 +13,7 @@ import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips } from "./par
 import { Detail } from "./Detail";
 import { useWatchlist } from "./watchlist-context";
 import { watchTargetOf } from "@/lib/detail";
+import { byTldValue } from "@/lib/tld-order";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
@@ -301,7 +302,12 @@ function NameCard({
 }) {
   const { state } = entry;
   const v = verdictOf(state);
-  const domains = state.surfaces.filter((s) => s.type === "domain");
+  // Order domain tiles by TLD value (.com before .xyz), a stable display sort
+  // independent of the completion order the surfaces resolve in.
+  const domains = state.surfaces
+    .filter((s) => s.type === "domain")
+    .slice()
+    .sort((a, b) => byTldValue(a.tld ?? a.surface, b.tld ?? b.surface));
   const registries = state.surfaces.filter((s) => s.type === "registry");
   const anyTaken = state.surfaces.some((s) => s.status === "taken" || s.status === "parked");
   const watchTarget = watchTargetOf(state.surfaces);
