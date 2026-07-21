@@ -3,6 +3,7 @@
 import type { CheckNameState } from "@/lib/check-stream";
 import { verdictOf } from "@/lib/check-stream";
 import { toDetailRows, tldContextView, watchTargetOf, type DetailAcquire, type TldContextView } from "@/lib/detail";
+import { hasAffiliateLinks, registrarLinks } from "@/lib/links";
 import { getTldContext } from "@domain-finder/core";
 import { StatusDot, StatusPill } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
@@ -126,6 +127,7 @@ export function Detail({
                 )}
               </div>
               {ctx && <TldContextPanel view={ctx} />}
+              {r.type === "domain" && r.status === "available" && <RegisterRow domain={r.surface} />}
             </div>
           );
         })}
@@ -213,6 +215,39 @@ function tagStyle(bg: string, color: string, border: string) {
     borderRadius: 6,
     padding: "3px 8px",
   } as const;
+}
+
+// A neutral row of "register this domain here" links across registrars, for an
+// available domain. No prices (none available without a pricing API). Order is
+// neutral; an affiliate disclosure renders only if any link carries a param.
+function RegisterRow({ domain }: { domain: string }) {
+  const links = registrarLinks(domain);
+  const showDisclosure = hasAffiliateLinks(links);
+  return (
+    <div style={{ borderTop: `1px dashed ${T.line}`, padding: "10px 13px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: T.faint }}>
+        Register at
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+        {links.map((l) => (
+          <a
+            key={l.id}
+            href={l.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, fontWeight: 600, color: T.ink, background: T.card, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 11px", textDecoration: "none" }}
+          >
+            {l.name} ↗
+          </a>
+        ))}
+      </div>
+      {showDisclosure && (
+        <div style={{ fontSize: 11, color: T.faint, lineHeight: 1.4 }}>
+          Some links are affiliate links — we may earn a commission at no extra cost to you.
+        </div>
+      )}
+    </div>
+  );
 }
 
 // The TLD context panel under each domain row: what the TLD signals, its
