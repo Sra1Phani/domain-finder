@@ -351,7 +351,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
                   <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: T.faint, marginLeft: "auto" }}>score {c.score}</span>
                 </div>
                 <button
-                  onClick={() => onCheckName(c.checkName)}
+                  onClick={() => onCheckName(c.source === "domain-hack" ? c.domain : c.checkName)}
                   style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: "#fff", background: T.brand, border: "none", borderRadius: 9, padding: 9, cursor: "pointer", width: "100%" }}
                 >
                   Check this name →

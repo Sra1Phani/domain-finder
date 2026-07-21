@@ -10,6 +10,7 @@ import {
 } from "@/lib/check-stream";
 import type { CheckEvent } from "@/lib/check-events";
 import { pickVariations, type GenerateCandidate } from "@/lib/generate-dto";
+import { parseCheckInput } from "@/lib/check-input";
 import type { SearchResponse } from "@domain-finder/core";
 import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips, StatusDot, AvailableOnlyToggle } from "./parts";
 import { Detail } from "./Detail";
@@ -80,12 +81,15 @@ export function Check({
   }
 
   function addName(raw: string) {
-    const name = raw.trim().toLowerCase().replace(/\s+/g, "-");
+    // A full domain ("toolna.me") is split into its stem + TLD so we check that
+    // exact domain (adding .me to the set) rather than building "toolna.me.com".
+    const { name, extraTlds } = parseCheckInput(raw);
     if (!name || active.current.has(name)) return;
     active.current.add(name);
     const id = ++seq.current;
     setEntries((prev) => [{ id, name, state: initialNameState(name) }, ...prev]);
-    void runCheck(id, name, tlds);
+    const checkTlds = extraTlds.length ? [...new Set([...tlds, ...extraTlds])] : tlds;
+    void runCheck(id, name, checkTlds);
   }
 
   function removeEntry(id: number, name: string) {
@@ -568,8 +572,8 @@ export function Variations({
           {vs.items.map((c) => (
             <button
               key={c.name}
-              onClick={() => onCheck(c.checkName)}
-              title={`Check ${c.checkName}`}
+              onClick={() => onCheck(c.source === "domain-hack" ? c.domain : c.checkName)}
+              title={`Check ${c.name}`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
