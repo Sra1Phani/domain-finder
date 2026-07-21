@@ -4,7 +4,9 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { toCandidates, filterBySource, type GenerateCandidate, type SourceFilter } from "@/lib/generate-dto";
 import type { SearchResponse, Vibe } from "@domain-finder/core";
-import { SourceTag, StatusDot, TldChips } from "./parts";
+import { SourceTag, StatusDot, TldChips, AvailableOnlyToggle } from "./parts";
+import { useAvailableOnly } from "./available-only";
+import { filterAvailable } from "@/lib/available-filter";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
@@ -59,6 +61,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [vibe, setVibe] = useState<Vibe>("any");
   const [short, setShort] = useState(false);
+  const [availOnly, toggleAvailOnly] = useAvailableOnly();
 
   const toggleTld = (tld: string) =>
     setTlds((prev) => (prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld]));
@@ -100,10 +103,11 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
     return next;
   };
 
-  // Two pure view filters over the already-loaded list — dismissals, then the
-  // source segmented control. No refetch: switching filters never hits /api.
+  // Pure view filters over the already-loaded list — dismissals, then the
+  // source segmented control, then "available only". No refetch.
   const kept = candidates.filter((c) => !dismissed.has(c.name));
-  const visible = filterBySource(kept, sourceFilter);
+  const bySource = filterBySource(kept, sourceFilter);
+  const visible = filterAvailable(bySource, availOnly);
   const hacksOnly = sourceFilter === "hack";
   const steerChip = (on: boolean): CSSProperties => ({
     fontFamily: "inherit",
@@ -266,6 +270,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
               );
             })}
           </div>
+          <AvailableOnlyToggle on={availOnly} onToggle={toggleAvailOnly} />
         </div>
       )}
 
@@ -357,7 +362,7 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
         </div>
       )}
 
-      {candidates.length > 0 && !loading && visible.length === 0 && sourceFilter !== "all" && (
+      {candidates.length > 0 && !loading && visible.length === 0 && (sourceFilter !== "all" || availOnly) && (
         <div
           style={{
             marginTop: 14,
@@ -369,7 +374,11 @@ export function Generate({ onCheckName }: { onCheckName: (name: string) => void 
             padding: "30px 16px",
           }}
         >
-          {EMPTY_LABEL[sourceFilter]} — try another source.
+          {availOnly && bySource.length > 0
+            ? 'No available names in this batch — turn off "Available only" or generate again.'
+            : sourceFilter !== "all"
+              ? `${EMPTY_LABEL[sourceFilter]} — try another source.`
+              : 'No available names — turn off "Available only" or generate again.'}
         </div>
       )}
 

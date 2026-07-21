@@ -11,11 +11,13 @@ import {
 import type { CheckEvent } from "@/lib/check-events";
 import { pickVariations, type GenerateCandidate } from "@/lib/generate-dto";
 import type { SearchResponse } from "@domain-finder/core";
-import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips, StatusDot } from "./parts";
+import { StatusTile, SurfaceRow, VerdictPill, GroupLabel, TldChips, StatusDot, AvailableOnlyToggle } from "./parts";
 import { Detail } from "./Detail";
 import { useWatchlist } from "./watchlist-context";
+import { useAvailableOnly } from "./available-only";
 import { watchTargetOf } from "@/lib/detail";
 import { byTldValue } from "@/lib/tld-order";
+import { filterAvailable } from "@/lib/available-filter";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius, radiusS, DEFAULT_TLDS_UI } from "@/lib/ui/tokens";
 
@@ -36,6 +38,7 @@ export function Check({
   const [detailId, setDetailId] = useState<number | null>(null);
   const seq = useRef(0);
   const { openWatch } = useWatchlist();
+  const [availOnly, toggleAvailOnly] = useAvailableOnly();
 
   const toggleTld = (tld: string) =>
     setTlds((prev) => (prev.includes(tld) ? prev.filter((t) => t !== tld) : [...prev, tld]));
@@ -243,8 +246,9 @@ export function Check({
         )}
       </div>
 
-      <div style={{ marginTop: 14, maxWidth: 640 }}>
+      <div style={{ marginTop: 14, maxWidth: 640, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <TldChips selected={tlds} onToggle={toggleTld} onAdd={addTld} onClear={clearTlds} />
+        <AvailableOnlyToggle on={availOnly} onToggle={toggleAvailOnly} />
       </div>
 
       {entries.length === 0 ? (
@@ -284,6 +288,7 @@ export function Check({
               onOpenDetail={() => setDetailId(e.id)}
               onWatch={openWatch}
               onCheckName={addName}
+              availOnly={availOnly}
             />
           ))}
         </div>
@@ -298,12 +303,14 @@ function NameCard({
   onOpenDetail,
   onWatch,
   onCheckName,
+  availOnly,
 }: {
   entry: Entry;
   onRemove: () => void;
   onOpenDetail: () => void;
   onWatch: (domain: string, status: string) => void;
   onCheckName: (name: string) => void;
+  availOnly: boolean;
 }) {
   const { state } = entry;
   const v = verdictOf(state);
@@ -313,6 +320,8 @@ function NameCard({
     .filter((s) => s.type === "domain")
     .slice()
     .sort((a, b) => byTldValue(a.tld ?? a.surface, b.tld ?? b.surface));
+  // "Available only" is a pure view filter over the already-checked tiles.
+  const shownDomains = filterAvailable(domains, availOnly);
   const registries = state.surfaces.filter((s) => s.type === "registry");
   const anyTaken = state.surfaces.some((s) => s.status === "taken" || s.status === "parked");
   const watchTarget = watchTargetOf(state.surfaces);
@@ -436,12 +445,18 @@ function NameCard({
       )}
 
       <div style={{ padding: "2px 18px 6px" }}>
-        <GroupLabel>Domains</GroupLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))", gap: 8 }}>
-          {domains.map((s) => (
-            <StatusTile key={s.surface} label={s.tld ?? s.label} status={s.status} meta={s.meta} />
-          ))}
-        </div>
+        <GroupLabel>Domains{availOnly ? " · available only" : ""}</GroupLabel>
+        {availOnly && v.done && shownDomains.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: T.muted, fontFamily: FONT_MONO, padding: "4px 0 2px" }}>
+            No available domains here — see free alternatives below.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))", gap: 8 }}>
+            {shownDomains.map((s) => (
+              <StatusTile key={s.surface} label={s.tld ?? s.label} status={s.status} meta={s.meta} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "10px 18px 6px" }}>

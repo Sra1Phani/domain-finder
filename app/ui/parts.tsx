@@ -124,6 +124,49 @@ export function TldChips({
   );
 }
 
+/** Persisted "Available only" view toggle (checkbox chip). Precise label. */
+export function AvailableOnlyToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const S = statusStyle("available");
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        fontFamily: FONT_MONO,
+        fontSize: 12.5,
+        fontWeight: on ? 600 : 500,
+        padding: "5px 11px",
+        borderRadius: 999,
+        cursor: "pointer",
+        border: `1px solid ${on ? S.border : T.line}`,
+        background: on ? S.bg : T.card,
+        color: on ? S.text : T.muted,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-grid",
+          placeItems: "center",
+          width: 14,
+          height: 14,
+          borderRadius: 4,
+          fontSize: 10,
+          color: "#fff",
+          background: on ? S.solid : "transparent",
+          border: `1px solid ${on ? S.solid : T.line}`,
+        }}
+      >
+        {on ? "✓" : ""}
+      </span>
+      Available only
+    </button>
+  );
+}
+
 export function StatusDot({ status, size = 17 }: { status: string; size?: number }) {
   const S = statusStyle(status);
   return (
