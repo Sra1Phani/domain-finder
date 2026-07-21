@@ -7,6 +7,7 @@
 import type { SurfaceState } from "./check-stream";
 import type { UiStatus } from "./ui/status";
 import { buyUrl, whoisUrl } from "./links";
+import type { TldContext } from "@domain-finder/core";
 
 export type DetailCta = { label: string; href: string };
 
@@ -25,6 +26,43 @@ export type DetailRow = {
   cta: DetailCta | null;
   acquire: DetailAcquire | null;
 };
+
+// --- TLD context → Detail display model --------------------------------------
+
+export type TldBadgeTone = "open" | "restricted" | "brand";
+
+export type TldContextView = {
+  badgeLabel: string;
+  badgeTone: TldBadgeTone;
+  /** eligibility requirement, for restricted/brand */
+  restriction?: string;
+  connotation?: string;
+  pros: string[];
+  cons: string[];
+  gotcha?: string;
+  /** rough price tier, explicitly labeled an estimate — never a live price */
+  priceEstimate?: string;
+  /** false ⇒ thin auto-derived fallback; render the sparse form */
+  curated: boolean;
+};
+
+/** Map a core TldContext to what the Detail row renders. Pure. The price band
+ * is surfaced only as a labeled estimate; nothing is invented. */
+export function tldContextView(ctx: TldContext): TldContextView {
+  const badgeLabel =
+    ctx.registrable === "open" ? "Open" : ctx.registrable === "restricted" ? "Restricted" : "Brand-operated";
+  return {
+    badgeLabel,
+    badgeTone: ctx.registrable,
+    restriction: ctx.restriction,
+    connotation: ctx.connotation,
+    pros: ctx.pros ?? [],
+    cons: ctx.cons ?? [],
+    gotcha: ctx.gotcha,
+    priceEstimate: ctx.priceBand ? `${ctx.priceBand} · est.` : undefined,
+    curated: ctx.curated,
+  };
+}
 
 function ctaFor(s: SurfaceState): DetailCta | null {
   if (s.type === "domain") {

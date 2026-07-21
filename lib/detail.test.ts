@@ -1,7 +1,8 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { toDetailRows } from "./detail";
+import { toDetailRows, tldContextView } from "./detail";
 import type { SurfaceState } from "./check-stream";
+import { getTldContext } from "@domain-finder/core";
 
 const dom = (surface: string, status: SurfaceState["status"], extra: Partial<SurfaceState> = {}): SurfaceState => ({
   surface,
@@ -72,4 +73,33 @@ test("checking rows show a checking meta, not a fabricated status line", () => {
   const [row] = toDetailRows([dom("acme.com", "checking")]);
   assert.equal(row.meta, "checking…");
   assert.equal(row.cta, null);
+});
+
+test("tldContextView: a curated open TLD renders rich, with a labeled price estimate", () => {
+  const v = tldContextView(getTldContext(".com"));
+  assert.equal(v.badgeTone, "open");
+  assert.equal(v.badgeLabel, "Open");
+  assert.ok(v.curated);
+  assert.ok(v.pros.length > 0, "curated .com has pros");
+  assert.ok(v.gotcha);
+  assert.equal(v.priceEstimate, "$ · est.", "price shown only as an estimate");
+});
+
+test("tldContextView: a restricted TLD surfaces its requirement (never a plain 'available')", () => {
+  const v = tldContextView(getTldContext(".th"));
+  assert.equal(v.badgeTone, "restricted");
+  assert.equal(v.badgeLabel, "Restricted");
+  assert.ok(v.restriction && v.restriction.length > 0);
+
+  const brand = tldContextView(getTldContext(".google"));
+  assert.equal(brand.badgeTone, "brand");
+  assert.equal(brand.badgeLabel, "Brand-operated");
+});
+
+test("tldContextView: an uncurated fallback renders the thin form (no fabricated price)", () => {
+  const v = tldContextView(getTldContext(".zzq"));
+  assert.equal(v.curated, false);
+  assert.equal(v.badgeTone, "open");
+  assert.deepEqual(v.pros, []);
+  assert.equal(v.priceEstimate, undefined);
 });

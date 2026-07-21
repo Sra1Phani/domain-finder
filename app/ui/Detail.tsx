@@ -2,7 +2,8 @@
 
 import type { CheckNameState } from "@/lib/check-stream";
 import { verdictOf } from "@/lib/check-stream";
-import { toDetailRows, watchTargetOf, type DetailAcquire } from "@/lib/detail";
+import { toDetailRows, tldContextView, watchTargetOf, type DetailAcquire, type TldContextView } from "@/lib/detail";
+import { getTldContext } from "@domain-finder/core";
 import { StatusDot, StatusPill } from "./parts";
 import { statusStyle } from "@/lib/ui/status";
 import { T, FONT_DISPLAY, FONT_MONO, radius } from "@/lib/ui/tokens";
@@ -86,41 +87,45 @@ export function Detail({
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 9 }}>
         {rows.map((r) => {
           const tag = r.type === "domain" ? r.surface.slice(r.surface.indexOf(".")) : r.surface;
+          const ctx = r.type === "domain" ? tldContextView(getTldContext(tag)) : null;
           return (
             <div
               key={r.surface}
-              style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", borderRadius: 12, border: `1px solid ${T.line}`, background: T.card, flexWrap: "wrap" }}
+              style={{ borderRadius: 12, border: `1px solid ${T.line}`, background: T.card, overflow: "hidden" }}
             >
-              <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.muted, background: T.subtle, border: `1px solid ${T.line}`, borderRadius: 7, padding: "6px 7px", minWidth: 40, textAlign: "center" }}>
-                {tag}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{r.label}</div>
-                <div style={{ fontSize: 12, color: T.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meta}</div>
-                {r.acquire && <AcquireTag acquire={r.acquire} />}
+              <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", flexWrap: "wrap" }}>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 10, fontWeight: 600, color: T.muted, background: T.subtle, border: `1px solid ${T.line}`, borderRadius: 7, padding: "6px 7px", minWidth: 40, textAlign: "center" }}>
+                  {tag}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{r.label}</div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meta}</div>
+                  {r.acquire && <AcquireTag acquire={r.acquire} />}
+                </div>
+                <StatusPill status={r.status} />
+                {r.cta && (
+                  <a
+                    href={r.cta.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      textDecoration: "none",
+                      borderRadius: 8,
+                      padding: "7px 11px",
+                      border: r.status === "available" ? "none" : `1px solid ${T.line}`,
+                      color: r.status === "available" ? "#fff" : T.muted,
+                      background: r.status === "available" ? T.brand : T.subtle,
+                    }}
+                  >
+                    {r.cta.label}
+                  </a>
+                )}
               </div>
-              <StatusPill status={r.status} />
-              {r.cta && (
-                <a
-                  href={r.cta.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                    textDecoration: "none",
-                    borderRadius: 8,
-                    padding: "7px 11px",
-                    border: r.status === "available" ? "none" : `1px solid ${T.line}`,
-                    color: r.status === "available" ? "#fff" : T.muted,
-                    background: r.status === "available" ? T.brand : T.subtle,
-                  }}
-                >
-                  {r.cta.label}
-                </a>
-              )}
+              {ctx && <TldContextPanel view={ctx} />}
             </div>
           );
         })}
@@ -208,4 +213,67 @@ function tagStyle(bg: string, color: string, border: string) {
     borderRadius: 6,
     padding: "3px 8px",
   } as const;
+}
+
+// The TLD context panel under each domain row: what the TLD signals, its
+// registrability (open / restricted-with-requirement / brand), pros/cons, the
+// one gotcha, and a rough — explicitly estimated — price band. Curated TLDs
+// render rich; fallback TLDs render the thin form (no invented facts/prices).
+function TldContextPanel({ view }: { view: TldContextView }) {
+  const tone =
+    view.badgeTone === "open"
+      ? statusStyle("available")
+      : view.badgeTone === "restricted"
+        ? statusStyle("parked")
+        : statusStyle("invalid");
+  const chip = (bg: string, color: string, border: string, children: string) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 600, fontFamily: FONT_MONO, color, background: bg, border: `1px solid ${border}`, borderRadius: 999, padding: "2px 8px" }}>
+      {children}
+    </span>
+  );
+  return (
+    <div style={{ borderTop: `1px dashed ${T.line}`, padding: "10px 13px", background: T.subtle, display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+        {chip(tone.bg, tone.text, tone.border, `${view.badgeTone === "open" ? "" : "⚠ "}${view.badgeLabel}`)}
+        {view.priceEstimate && chip(T.card, T.muted, T.line, `≈ ${view.priceEstimate}`)}
+        {!view.curated && (
+          <span style={{ fontSize: 10.5, color: T.faint, fontFamily: FONT_MONO }}>limited info for this TLD</span>
+        )}
+      </div>
+
+      {/* Restricted/brand: surface the requirement prominently so it never reads
+          as a plain "available." */}
+      {view.restriction && (
+        <div style={{ fontSize: 12, color: tone.text, background: tone.bg, border: `1px solid ${tone.border}`, borderRadius: 8, padding: "6px 9px", lineHeight: 1.4 }}>
+          {view.restriction}
+        </div>
+      )}
+
+      {view.connotation && (
+        <div style={{ fontSize: 12.5, color: T.muted, lineHeight: 1.45 }}>{view.connotation}</div>
+      )}
+
+      {(view.pros.length > 0 || view.cons.length > 0) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {view.pros.map((p) => (
+            <span key={`p-${p}`} style={{ fontSize: 11, color: statusStyle("available").text, background: statusStyle("available").bg, border: `1px solid ${statusStyle("available").border}`, borderRadius: 6, padding: "2px 7px" }}>
+              + {p}
+            </span>
+          ))}
+          {view.cons.map((c) => (
+            <span key={`c-${c}`} style={{ fontSize: 11, color: T.muted, background: T.card, border: `1px solid ${T.line}`, borderRadius: 6, padding: "2px 7px" }}>
+              – {c}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {view.gotcha && (
+        <div style={{ fontSize: 11.5, color: T.muted, display: "flex", gap: 6, lineHeight: 1.4 }}>
+          <span style={{ color: statusStyle("parked").solid, flexShrink: 0 }}>⚠</span>
+          <span>{view.gotcha}</span>
+        </div>
+      )}
+    </div>
+  );
 }
