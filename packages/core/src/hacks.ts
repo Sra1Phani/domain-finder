@@ -9,7 +9,7 @@
 import type { Suggestion } from "./types";
 import type { CacheStore } from "./cache";
 import type { FetchLike } from "./availability";
-import { isRestrictedTld } from "./tlds";
+import { isRestrictedTld } from "./tld-context";
 
 const IANA_TLDS = "https://data.iana.org/TLD/tlds-alpha-by-domain.txt";
 const ZONES_KEY = "iana:zones";

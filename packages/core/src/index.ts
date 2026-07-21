@@ -10,6 +10,7 @@
 export * from "./types";
 export * from "./strings";
 export * from "./tlds";
+export * from "./tld-context";
 export * from "./rdap-status";
 export * from "./rank";
 export * from "./cadence";
