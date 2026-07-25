@@ -21,7 +21,6 @@ deliberately low-risk to connect to:
 
 If you find a security issue, please report it privately rather than opening a
 public issue. Use GitHub's **Report a vulnerability** flow (Security → Advisories
-→ Report a vulnerability) on this repository, or email the maintainer at
-`sravan.phani@evolveailabs.com`. Please include steps to reproduce and the
-affected endpoint or tool. We'll acknowledge receipt and follow up with a fix or
-mitigation timeline.
+→ Report a vulnerability) on this repository. Please include steps to reproduce
+and the affected endpoint or tool. We'll acknowledge receipt and follow up with a
+fix or mitigation timeline.
