@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# BRDs — business requirements docs stay local, never pushed
+**/BRD.md
+**/*BRD*.md
+**/*brd*.md
+
+# Claude Design reference export — keep local, not in git
+docs/Clearance.dc.html
