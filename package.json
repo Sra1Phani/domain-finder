@@ -18,6 +18,7 @@
   "dependencies": {
     "@domain-finder/core": "*",
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^7.0.30",
     "drizzle-orm": "^0.45.2",
     "mcp-handler": "^1.1.0",
