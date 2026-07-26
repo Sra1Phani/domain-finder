@@ -30,9 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — all env files stay local, including .env.example
 .env*
-!.env.example
 
 # vercel
 .vercel
@@ -41,10 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# BRDs — business requirements docs stay local, never pushed
-**/BRD.md
-**/*BRD*.md
-**/*brd*.md
+# BRDs — business requirements docs stay local, never pushed (any format)
+**/*BRD*
+**/*brd*
+**/*Brd*
 
 # Claude Design reference export — keep local, not in git
 docs/Clearance.dc.html
