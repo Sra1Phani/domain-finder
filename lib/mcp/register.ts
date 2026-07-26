@@ -7,11 +7,45 @@
 // "safe to connect" property.
 
 import { z } from "zod";
+import { after } from "next/server";
+import { headers } from "next/headers";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Core } from "@domain-finder/core";
 import { checkNameHandler, generateNamesHandler } from "./handlers";
+import { logRequest, hashClient } from "../request-log";
 
 const surfaceEnum = z.enum(["github", "npm", "pypi"]);
+
+/**
+ * Best-effort client hash for an MCP call. The request headers aren't guaranteed
+ * to be reachable from every transport, so fall back to null rather than failing
+ * the tool.
+ */
+async function mcpClientHash(): Promise<string | null> {
+  try {
+    const h = await headers();
+    const fwd = h.get("x-forwarded-for");
+    const ip = fwd ? fwd.split(",")[0]!.trim() : (h.get("x-real-ip")?.trim() ?? null);
+    return hashClient(ip);
+  } catch {
+    return null;
+  }
+}
+
+/** Schedule a best-effort log of one MCP tool call after the response is sent. */
+function logMcpCall(
+  operation: string,
+  input: unknown,
+  output: unknown,
+  clientHash: string | null,
+): void {
+  const entry = { surface: "mcp" as const, operation, input, output, clientHash };
+  try {
+    after(() => logRequest(entry));
+  } catch {
+    void logRequest(entry);
+  }
+}
 
 export function registerTools(server: McpServer, core: Core): void {
   server.registerTool(
@@ -60,6 +94,7 @@ export function registerTools(server: McpServer, core: Core): void {
     },
     async (args) => {
       const out = await checkNameHandler(args, core);
+      logMcpCall("check_name", args, out.structuredContent, await mcpClientHash());
       return {
         content: [{ type: "text" as const, text: out.text }],
         structuredContent: out.structuredContent,
@@ -102,6 +137,7 @@ export function registerTools(server: McpServer, core: Core): void {
     },
     async (args) => {
       const out = await generateNamesHandler(args, core);
+      logMcpCall("generate_names", args, out.structuredContent, await mcpClientHash());
       return {
         content: [{ type: "text" as const, text: out.text }],
         structuredContent: out.structuredContent,

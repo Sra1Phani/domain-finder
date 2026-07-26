@@ -19,6 +19,9 @@ and the GitHub / npm / PyPI namespaces from any MCP-capable agent.
     pre-checked for domain availability; feed the favorites into `check_name`.
 - **Read-only, and no credentials required** — nothing to sign up for, no keys
   to paste. Safe to connect.
+- **Requests are logged.** Inputs and outputs are stored server-side (with a
+  salted hash of the caller IP, never the raw address) for analytics and abuse
+  review — see [SECURITY.md](SECURITY.md).
 
 **Cursor** (`~/.cursor/mcp.json`) and any client with native Streamable-HTTP
 support:

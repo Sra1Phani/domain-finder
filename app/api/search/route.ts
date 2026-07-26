@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { search } from "@/lib/core";
 import { VIBES, type SearchRequest, type Vibe } from "@domain-finder/core";
 import { RateLimiter, clientKey } from "@/lib/rate-limit";
+import { logRequest, hashClient } from "@/lib/request-log";
 
 // RDAP calls + optional AI use Node APIs and can take a few seconds.
 export const runtime = "nodejs";
@@ -56,14 +57,21 @@ export async function POST(req: Request) {
       ? (body.vibe as Vibe)
       : undefined;
 
-  const result = await search({
+  const input = {
     query: body.query,
     tlds: Array.isArray(body.tlds) ? body.tlds : undefined,
     useAi: body.useAi,
     useHacks: body.useHacks,
     vibe,
     short: body.short === true,
-  });
+  };
+  const result = await search(input);
+
+  // Best-effort, after the response is sent — never blocks or fails the search.
+  const clientHash = hashClient(clientKey(req));
+  after(() =>
+    logRequest({ surface: "search", operation: "search", input, output: result, clientHash }),
+  );
 
   return NextResponse.json(result);
 }

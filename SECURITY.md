@@ -17,6 +17,16 @@ deliberately low-risk to connect to:
   library itself reads no environment variables — that boundary is enforced in
   the build (an ESLint rule) so it can't regress.
 
+## Data handling
+
+Requests to both the web API and the MCP server are logged: the input (your
+query, or candidate names and options) and the output (the results) are stored
+server-side, together with a **salted hash of the caller's IP** — never the raw
+address — and a timestamp. This is for analytics and abuse review. The MCP tools
+still accept no credentials, so there is nothing secret to record; but treat the
+names and descriptions you send as retained. Logging is best-effort — it happens
+after the response and never blocks or fails a request.
+
 ## Reporting a vulnerability
 
 If you find a security issue, please report it privately rather than opening a

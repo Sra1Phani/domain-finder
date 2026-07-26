@@ -150,6 +150,39 @@ export const alerts = pgTable(
   (t) => [unique("alerts_watch_event_key").on(t.watchId, t.eventId)],
 );
 
+/**
+ * Every request served, input and output, for analytics and abuse review.
+ *
+ * Deliberately denormalised and append-only: `input`/`output` are the raw
+ * payloads as received/returned, so the record survives changes to those shapes.
+ * `client_hash` is a salted hash of the caller IP, never the raw address (see
+ * lib/request-log.ts). Writes are best-effort — a logging failure never affects
+ * the response — so this table is a convenience, not a source of truth.
+ */
+export const requestLogs = pgTable(
+  "request_logs",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    /** which surface served it: "search" (web API) or "mcp" */
+    surface: text("surface").notNull(),
+    /** the operation: "search" | "check_name" | "generate_names" */
+    operation: text("operation").notNull(),
+    /** request payload as received */
+    input: jsonb("input"),
+    /** response payload as returned */
+    output: jsonb("output"),
+    /** salted hash of the client IP; null when it couldn't be determined */
+    clientHash: text("client_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("request_logs_created_at_idx").on(t.createdAt)],
+);
+
 export type DomainRow = typeof domains.$inferSelect;
 export type WatchRow = typeof watches.$inferSelect;
 export type WatchEventRow = typeof watchEvents.$inferSelect;
+export type RequestLogRow = typeof requestLogs.$inferSelect;
