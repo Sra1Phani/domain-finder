@@ -15,8 +15,15 @@
 // conflict and sends nothing. If the send itself fails we delete the row again
 // so the next run retries it — at-least-once, with the duplicate window narrowed
 // to a hard crash between insert and send.
+//
+// Retries are driven off *persisted state*, not off a fresh status change: a
+// transition is logged once, but the alert for it is re-derived on every poll
+// while the domain still sits in that alertable status (see latestAlertableEvent
+// + the alert block in pollDue). That's what lets an alert that couldn't be
+// delivered — a transient mailer failure, or no mail key configured yet — go out
+// on a later run rather than being lost after the one poll that saw the change.
 
-import { and, asc, eq, exists, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, lte, sql } from "drizzle-orm";
 import { getDb, type Db } from "./db";
 import { alerts, domains, watchEvents, watches } from "./db/schema";
 import { availabilityProvider } from "./core";
@@ -85,6 +92,11 @@ async function fanOut(
     .where(and(eq(watches.domain, domain), eq(watches.state, "watching")));
 
   const mailer = getMailer();
+  // No delivery channel — production without a mail key (see getMailer). Don't
+  // claim, don't fire the watch, don't log PII: leave every alert for this event
+  // undelivered so a later run with a real mailer re-derives and sends it.
+  if (!mailer) return 0;
+
   let sent = 0;
 
   for (const w of watching) {
@@ -223,11 +235,42 @@ export async function pollDue(
       })
       .where(eq(domains.domain, row.domain));
 
-    // Alerts fire only on a transition, and only on the two that are actionable.
-    if (changed && eventId && isAlertable(res.status)) {
-      summary.alertsSent += await fanOut(db, row.domain, eventId, res);
+    // Alerts fire on a transition into an actionable status. We attempt delivery
+    // on every poll the domain sits in that status, not only the one that first
+    // saw the change: on a fresh transition we use that event; otherwise we
+    // re-derive the latest matching event so an alert deferred or failed on an
+    // earlier run still goes out. fanOut's unique(watch_id, event_id) makes
+    // redelivery a no-op for anyone already notified, so this never double-sends.
+    if (isAlertable(res.status)) {
+      const alertEventId =
+        changed && eventId
+          ? eventId
+          : await latestAlertableEvent(db, row.domain, res.status);
+      if (alertEventId) {
+        summary.alertsSent += await fanOut(db, row.domain, alertEventId, res);
+      }
     }
   }
 
   return summary;
+}
+
+/**
+ * The most recent transition into `status` for a domain. Alerting re-derives the
+ * event this way (rather than from a live status change) so a previously
+ * undelivered alert can be retried while the domain remains in an alertable
+ * state — the transition is only ever logged once.
+ */
+async function latestAlertableEvent(
+  db: Db,
+  domain: string,
+  status: AvailabilityResult["status"],
+): Promise<string | null> {
+  const [ev] = await db
+    .select({ id: watchEvents.id })
+    .from(watchEvents)
+    .where(and(eq(watchEvents.domain, domain), eq(watchEvents.toStatus, status)))
+    .orderBy(desc(watchEvents.observedAt))
+    .limit(1);
+  return ev?.id ?? null;
 }

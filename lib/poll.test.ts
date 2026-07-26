@@ -117,6 +117,51 @@ describe("pollDue", { skip: !hasDatabase() && "DATABASE_URL not set" }, () => {
     assert.equal(events.length, 1, "the transition log records changes, not observations");
   });
 
+  test("an alert with no mailer is deferred, not lost — a later run delivers it", async () => {
+    // Regression: in production with no mail key, getMailer() returns null. The
+    // poller must log the transition but NOT fabricate a delivery — otherwise the
+    // alert row and a fired watch would make the alert unrecoverable once a real
+    // mailer is configured. Then, with a mailer available, the *same* transition
+    // must still go out even though the status hasn't changed again.
+    const provider = fake({ status: "deleting", bucket: "dropping" });
+    // process.env.NODE_ENV is typed read-only; alias to a mutable view to toggle it.
+    const env = process.env as Record<string, string | undefined>;
+    const savedNodeEnv = env.NODE_ENV;
+    const savedKey = env.RESEND_API_KEY;
+    delete env.RESEND_API_KEY;
+    try {
+      // Phase 1: production, no mailer -> defer.
+      env.NODE_ENV = "production";
+      const first = await pollDue({ db, now: NOW, provider });
+      assert.equal(first.transitions, 1, "the transition is still logged");
+      assert.equal(first.alertsSent, 0, "but nothing is sent with no mailer");
+
+      const [w] = await db.select().from(watches).where(eq(watches.domain, DOMAIN));
+      const claimed = await db.select().from(alerts).where(eq(alerts.watchId, w.id));
+      assert.equal(claimed.length, 0, "no delivery recorded — the alert stays pending");
+      assert.equal(w.state, "watching", "and the watch is not retired");
+
+      // Phase 2: a mailer is now available; the domain is due again but its status
+      // is unchanged, so delivery has to be re-derived from the logged event.
+      env.NODE_ENV = "development"; // -> console mailer, no network
+      await db
+        .update(domains)
+        .set({ nextCheckAt: new Date(NOW.getTime() - HOUR) })
+        .where(eq(domains.domain, DOMAIN));
+      const second = await pollDue({ db, now: NOW, provider });
+
+      assert.equal(second.transitions, 0, "no new transition — the state hasn't changed");
+      assert.equal(second.alertsSent, 1, "the previously-deferred alert now goes out");
+
+      const delivered = await db.select().from(alerts).where(eq(alerts.watchId, w.id));
+      assert.equal(delivered.length, 1, "exactly one delivery, recorded once");
+    } finally {
+      if (savedNodeEnv === undefined) delete env.NODE_ENV;
+      else env.NODE_ENV = savedNodeEnv;
+      if (savedKey !== undefined) env.RESEND_API_KEY = savedKey;
+    }
+  });
+
   test("inside 24h of the estimated drop, cadence tightens to hourly", async () => {
     const drop = new Date(NOW.getTime() + 6 * HOUR).toISOString();
     await pollDue({

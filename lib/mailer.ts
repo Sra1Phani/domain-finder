@@ -67,6 +67,21 @@ export const resendMailer: Mailer = {
   },
 };
 
-export function getMailer(): Mailer {
-  return hasMailCredentials() ? resendMailer : consoleMailer;
+/**
+ * The active transport, or `null` when there is none to use.
+ *
+ * With a key, that's Resend. Without one we return the console fallback ONLY
+ * outside production — locally it keeps the whole flow drivable with no signup.
+ * In production a missing key returns `null` rather than the console mailer,
+ * because the fallback would otherwise (a) print the recipient's email and their
+ * manage token — an auth credential — into the runtime logs, and (b) let the
+ * poller record a "console" send as a durable delivery, so the alert would never
+ * be re-sent once a real key is added. `null` makes the poller defer instead:
+ * the alert stays undelivered and a later run picks it up once RESEND_API_KEY
+ * is set. See lib/poll.ts.
+ */
+export function getMailer(): Mailer | null {
+  if (hasMailCredentials()) return resendMailer;
+  if (process.env.NODE_ENV === "production") return null;
+  return consoleMailer;
 }
