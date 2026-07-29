@@ -55,6 +55,12 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
         clientHash: entry.clientHash ?? null,
       });
   } catch (err) {
-    console.warn("request-log: write failed", err);
+    // Log a concise reason only. The full drizzle error message embeds the query
+    // params — i.e. the input/output payload — which is exactly what we don't
+    // want spilling into the runtime logs. Prefer the underlying pg SQLSTATE code
+    // (e.g. 42P01 = undefined_table) when present.
+    const cause = (err as { cause?: { code?: string } }).cause;
+    const reason = cause?.code ?? (err instanceof Error ? err.name : "unknown");
+    console.warn(`request-log: write failed for ${entry.surface}/${entry.operation} (${reason})`);
   }
 }
